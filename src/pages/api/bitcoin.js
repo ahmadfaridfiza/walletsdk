@@ -1,3 +1,4 @@
+
 import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
 import { bech32m } from 'bech32';
@@ -5,9 +6,12 @@ import { getPublicKey, utils } from '@noble/secp256k1';
 
 export default async function handler(req, res) {
   try {
-    const mnemonic = bip39.generateMnemonic(128);
-    const seed = await bip39.mnemonicToSeed(mnemonic);
+    const { mnemonic } = req.body;
+    if (!mnemonic || !bip39.validateMnemonic(mnemonic)) {
+      throw new Error('Invalid mnemonic');
+    }
 
+    const seed = await bip39.mnemonicToSeed(mnemonic);
     const network = bitcoin.networks.bitcoin;
     const root = bitcoin.bip32.fromSeed(seed, network);
 
@@ -25,13 +29,14 @@ export default async function handler(req, res) {
     const tweakBN = BigInt('0x' + Buffer.from(tweakHash).toString('hex'));
     const privKeyBN = BigInt('0x' + child.privateKey.toString('hex'));
 
-    // Curve Order n (secp256k1)
+    // secp256k1 curve order n
     const n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
 
-    // Tweak private key (privKey + tweak mod n)
+    // Tweak private key
     const tweakedPrivKey = (privKeyBN + tweakBN) % n;
-
     const tweakedPrivKeyHex = tweakedPrivKey.toString(16).padStart(64, '0');
+
+    // Get tweaked public key (x-only)
     const tweakedPubkey = getPublicKey(tweakedPrivKeyHex, true).slice(1);
 
     // Encode Taproot address (bc1p...)
@@ -42,10 +47,10 @@ export default async function handler(req, res) {
       mnemonic,
       path,
       address,
-      privateKey: child.toWIF()
+      tweakedPrivateKey: tweakedPrivKeyHex
     });
   } catch (error) {
-    console.error('Taproot BIP86 Generation Error:', error);
+    console.error('BIP86 Restore Error:', error);
     res.status(500).json({ error: error.message });
   }
 }
