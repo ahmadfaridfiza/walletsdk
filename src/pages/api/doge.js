@@ -14,7 +14,9 @@ const dogecoinNetwork = {
 
 export default async function handler(req, res) {
   try {
-    const wifModule = await import('wif'); // Dynamic import wif
+    const wifModule = await import('wif'); // Dynamic import
+    const wif = wifModule.default || wifModule; // ensure correct reference
+
     const mnemonic = bip39.generateMnemonic(128);
     const seed = await bip39.mnemonicToSeed(mnemonic);
 
@@ -27,9 +29,9 @@ export default async function handler(req, res) {
       network: dogecoinNetwork
     });
 
-    // Encode private key to WIF (uncompressed) for TokenPocket compatibility
+    // Encode uncompressed WIF private key
     const privateKeyBuffer = child.privateKey;
-    const wifKey = wifModule.encode(dogecoinNetwork.wif, privateKeyBuffer, false); // false = uncompressed
+    const wifKey = wif.encode(dogecoinNetwork.wif, privateKeyBuffer, false);  // false = uncompressed
 
     res.status(200).json({
       mnemonic,
