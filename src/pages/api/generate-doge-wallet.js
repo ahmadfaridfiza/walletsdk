@@ -5,7 +5,6 @@ import ecc from 'tiny-secp256k1';
 
 const bip32 = BIP32Factory(ecc);
 
-// Manual Dogecoin Network Params
 const dogecoinNetwork = {
   messagePrefix: '\x19Dogecoin Signed Message:\n',
   bech32: null,
@@ -13,7 +12,7 @@ const dogecoinNetwork = {
     public: 0x02facafd,
     private: 0x02fac398
   },
-  pubKeyHash: 0x1e,  // Prefix 'D'
+  pubKeyHash: 0x1e,  // D Prefix
   scriptHash: 0x16,
   wif: 0x9e
 };
@@ -24,7 +23,7 @@ export default async function handler(req, res) {
     const seed = await bip39.mnemonicToSeed(mnemonic);
     const root = bip32.fromSeed(seed, dogecoinNetwork);
 
-    const path = "m/44'/3'/0'/0/0";  // BIP44 Doge
+    const path = "m/44'/3'/0'/0/0";
     const child = root.derivePath(path);
 
     const { address } = bitcoin.payments.p2pkh({
@@ -36,12 +35,12 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       mnemonic,
-      derivationPath: path,
+      path,
       address,
       wif
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error:', error);
     res.status(500).json({ error: error.message });
   }
 }
