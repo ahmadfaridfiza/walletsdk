@@ -1,10 +1,9 @@
-
 import { Account, Aptos, AptosConfig, Network, SigningSchemeInput } from "@aptos-labs/ts-sdk";
 
 export default async function handler(req, res) {
   try {
-    // Setup Aptos Client (Devnet)
-    const config = new AptosConfig({ network: Network.DEVNET });
+    // Setup Aptos Client (MAINNET)
+    const config = new AptosConfig({ network: Network.MAINNET });
     const aptos = new Aptos(config);
 
     // Generate Account (Ed25519 Legacy, no mnemonic)
@@ -13,11 +12,8 @@ export default async function handler(req, res) {
       legacy: true
     });
 
-    // Fund Account via Faucet
-    await aptos.fundAccount({
-      accountAddress: account.accountAddress,
-      amount: 100_000_000 // 100 APT
-    });
+    // You CANNOT fund MAINNET accounts via faucet
+    // User must deposit manually from exchange or another wallet
 
     // Return JSON Response
     res.status(200).json({
