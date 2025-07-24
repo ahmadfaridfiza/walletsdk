@@ -1,6 +1,8 @@
-// pages/api/generate-xpub.js
+
 import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
+import { bech32m } from 'bech32';
+import * as crypto from 'crypto';
 
 export default async function handler(req, res) {
   try {
@@ -10,32 +12,72 @@ export default async function handler(req, res) {
     const network = bitcoin.networks.bitcoin;
     const root = bitcoin.bip32.fromSeed(seed, network);
 
-    const getXpub = (path) => {
-      const node = root.derivePath(path);
-      return node.neutered().toBase58();
+    const deriveLegacyAddress = (path) => {
+      const child = root.derivePath(path);
+      const payment = bitcoin.payments.p2pkh({ pubkey: child.publicKey, network });
+      return {
+        path,
+        address: payment.address,
+        privateKey: child.toWIF()
+      };
     };
 
-    const bip44Path = "m/44'/0'/0'";
-    const bip49Path = "m/49'/0'/0'";
-    const bip84Path = "m/84'/0'/0'";
-    const bip86Path = "m/86'/0'/0'";
+    const deriveSegwitP2SH = (path) => {
+      const child = root.derivePath(path);
+      const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
+      const payment = bitcoin.payments.p2sh({ redeem: p2wpkh, network });
+      return {
+        path,
+        address: payment.address,
+        privateKey: child.toWIF()
+      };
+    };
 
-    const xpub44 = getXpub(bip44Path);
-    const xpub49 = getXpub(bip49Path);
-    const xpub84 = getXpub(bip84Path);
-    const xpub86 = getXpub(bip86Path);
+    const deriveNativeSegwit = (path) => {
+      const child = root.derivePath(path);
+      const payment = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
+      return {
+        path,
+        address: payment.address,
+        privateKey: child.toWIF()
+      };
+    };
+
+    const deriveTaproot = (path) => {
+      const child = root.derivePath(path);
+      const xOnlyPubkey = child.publicKey.slice(1, 33);
+      const tweakHash = crypto.createHash('sha256').update(xOnlyPubkey).digest();
+
+      let tweakedPubkey = Buffer.from(xOnlyPubkey);
+      for (let i = 0; i < 32; i++) {
+        tweakedPubkey[i] = (tweakedPubkey[i] + tweakHash[i]) % 256;
+      }
+
+      const words = bech32m.toWords(Buffer.concat([Buffer.from([0x01]), tweakedPubkey]));
+      const address = bech32m.encode('bc', words);
+
+      return {
+        path,
+        address,
+        privateKey: child.toWIF()
+      };
+    };
+
+    const bip44 = deriveLegacyAddress("m/44'/0'/0'/0/0");
+    const bip49 = deriveSegwitP2SH("m/49'/0'/0'/0/0");
+    const bip84 = deriveNativeSegwit("m/84'/0'/0'/0/0");
+    const bip86 = deriveTaproot("m/86'/0'/0'/0/0");
 
     res.status(200).json({
       mnemonic,
-      xpub44,
-      xpub49,
-      xpub84,
-      xpub86
+      bip44,
+      bip49,
+      bip84,
+      bip86
     });
   } catch (error) {
-    console.error('Generate XPUB Error:', error);
+    console.error('Bitcoin Wallet Generation Error:', error);
     res.status(500).json({ error: error.message });
   }
 }
 
-// Usage: Access endpoint directly to generate mnemonic + xpubs
