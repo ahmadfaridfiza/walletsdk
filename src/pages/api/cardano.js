@@ -1,27 +1,33 @@
-import { Lucid } from 'lucid-cardano';
+import { KeyManagement, ChainHistory } from '@cardano-sdk/wallet';
+import { initializeKeyAgent } from '@cardano-sdk/key-management';
+import { InMemoryKeyAgent } from '@cardano-sdk/key-management';
+import { KeyRole } from '@cardano-sdk/core';
 import * as bip39 from 'bip39';
-import { Blockfrost } from 'lucid-cardano';
 
 export default async function handler(req, res) {
   try {
-    // Setup provider (Blockfrost dummy — kita tidak query ke chain)
-    const lucid = await Lucid.new(
-      new Blockfrost('https://cardano-mainnet.blockfrost.io/api/v0', '<YOUR_BLOCKFROST_KEY>'),
-      'Mainnet'
-    );
-
-    // Generate 24-word mnemonic
+    // 1. Generate mnemonic (24 kata)
     const mnemonic = bip39.generateMnemonic(256);
 
-    // Derive private key and address
-    const { payment } = lucid.utils.seedToKey(mnemonic);
-    const address = await lucid.utils.deriveAddress(payment, 'Mainnet');
-
-    res.status(200).json({
+    // 2. Inisialisasi keyAgent in-memory
+    const keyAgent = await initializeKeyAgent(InMemoryKeyAgent, {
       mnemonic,
-      privateKey: payment,
-      address
+      password: '', // kosong = tanpa passphrase
+      accountIndex: 0
     });
+
+    // 3. Ambil Address pertama (internal)
+    const address = await keyAgent.buildAddress({
+      index: 0,
+      role: KeyRole.Internal
+    });
+
+    // 4. Ambil private key (raw hex)
+    const privateKeyHex = Buffer.from(
+      keyAgent.getRawKey(KeyRole.Internal, 0)
+    ).toString('hex');
+
+    res.status(200).json({ mnemonic, privateKey: privateKeyHex, address });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
