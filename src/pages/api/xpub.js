@@ -1,6 +1,6 @@
 // pages/api/derive-from-xpub.js
 import ecc from '@bitcoinerlab/secp256k1';
-import { addressFromExtPubKey, Purpose } from '@swan-bitcoin/xpub-lib';
+import { addressFromExtPubKey, Purpose, initEccLib } from '@swan-bitcoin/xpub-lib';
 
 
 export default async function handler(req, res) {
