@@ -16,23 +16,29 @@ export default async function handler(req, res) {
 
     if (!child.privateKey) throw new Error('Failed to derive private key.');
 
-    // Get x-only public key (32 bytes)
-    const xOnlyPubkey = getPublicKey(child.privateKey, true).slice(1);
+    // Get x-only public key
+    const pubkey = getPublicKey(child.privateKey, true);
+    const xOnlyPubkey = pubkey.slice(1); // 32 bytes
 
-    // Tweak the xOnlyPubkey: tweakedKey = xOnlyPubkey + H(P)
-    const tweakedKey = schnorr.tapTweakPrivateKey(child.privateKey);
+    // Compute tweak (SHA256 of xOnlyPubkey)
+    const tweakHash = await utils.sha256(xOnlyPubkey);
+    const tweakBN = BigInt('0x' + Buffer.from(tweakHash).toString('hex'));
+    const privKeyBN = BigInt('0x' + child.privateKey.toString('hex'));
 
-    // Derive tweaked public key
-    const tweakedPubkey = getPublicKey(tweakedKey, true).slice(1);
+    const n = schnorr.CURVE.n;
+    const tweakedPrivKey = (privKeyBN + tweakBN) % n;
 
-    // Encode bc1p address
+    const tweakedPrivKeyBytes = tweakedPrivKey.toString(16).padStart(64, '0');
+    const tweakedPubkey = getPublicKey(tweakedPrivKeyBytes, true).slice(1);
+
+    // Encode Taproot address (bc1p...)
     const words = bech32m.toWords(Buffer.concat([Buffer.from([0x01]), Buffer.from(tweakedPubkey)]));
     const address = bech32m.encode('bc', words);
 
     res.status(200).json({
       mnemonic,
       path,
-      address, // <-- This will be bc1p...
+      address,
       privateKey: child.toWIF()
     });
   } catch (error) {
