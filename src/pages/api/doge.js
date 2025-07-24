@@ -2,18 +2,18 @@ const bip39 = require('bip39');
 const bitcoin = require('bitcoinjs-lib');
 const ecc = require('tiny-secp256k1');
 const { BIP32Factory } = require('bip32');
+
 const bip32 = BIP32Factory(ecc);
 
 const dogecoinNetwork = {
   messagePrefix: '\x19Dogecoin Signed Message:\n',
-  bech32: null, // Dogecoin does not use bech32
   bip32: {
     public: 0x02facafd,
     private: 0x02fac398,
   },
-  pubKeyHash: 0x1e,  // Addresses start with 'D'
-  scriptHash: 0x16,  // Addresses starting with '9'
-  wif: 0x9e          // WIF starting with '6'
+  pubKeyHash: 0x1e,
+  scriptHash: 0x16,
+  wif: 0x9e
 };
 
 export default async function handler(req, res) {
@@ -21,31 +21,29 @@ export default async function handler(req, res) {
     const strength = 128; // 12-word mnemonic
     const mnemonic = bip39.generateMnemonic(strength);
 
-    // Convert mnemonic to seed buffer
-    const seedBuffer = bip39.mnemonicToSeedSync(mnemonic);
+    const seed = await bip39.mnemonicToSeed(mnemonic);
 
-    // Derive root node from seed (no need to pass network)
-    const rootNode = bip32.fromSeed(seedBuffer);
+    // Important: bitcoinjs-lib bip32.fromSeed() ignores network here
+    const root = bip32.fromSeed(seed);
 
-    // Derive address path (Dogecoin BIP44 path: m/44'/3'/0'/0/0)
-    const addressNode = rootNode.derivePath("m/44'/3'/0'/0/0");
+    // Derive Dogecoin BIP44 path m/44'/3'/0'/0/0
+    const child = root.derivePath("m/44'/3'/0'/0/0");
 
-    // Generate Dogecoin address (P2PKH)
+    // Generate Dogecoin address
     const { address } = bitcoin.payments.p2pkh({
-      pubkey: addressNode.publicKey,
-      network: dogecoinNetwork,
+      pubkey: child.publicKey,
+      network: dogecoinNetwork
     });
 
-    // Generate WIF Private Key
-    const wif = addressNode.toWIF();
+    const privateKeyWIF = child.toWIF();
 
     res.status(200).json({
       mnemonic,
-      privateKey: wif,
+      privateKey: privateKeyWIF,
       address
     });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Dogecoin Wallet Error:', error);
     res.status(500).json({ error: error.message });
   }
 }
