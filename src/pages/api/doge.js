@@ -14,8 +14,8 @@ const dogecoinNetwork = {
 
 export default async function handler(req, res) {
   try {
-    const wifModule = await import('wif'); // Dynamic import
-    const wif = wifModule.default || wifModule; // ensure correct reference
+    const wifModule = await import('wif');
+    const wif = wifModule.default || wifModule;
 
     const mnemonic = bip39.generateMnemonic(128);
     const seed = await bip39.mnemonicToSeed(mnemonic);
@@ -23,15 +23,21 @@ export default async function handler(req, res) {
     const root = bitcoin.bip32.fromSeed(seed);
     const child = root.derivePath("m/44'/3'/0'/0/0");
 
-    // Generate Dogecoin address
+    if (!child.privateKey) {
+      throw new Error('Failed to derive private key.');
+    }
+
+    // Generate Dogecoin address (compressed true — but TokenPocket only wants uncompressed WIF)
     const { address } = bitcoin.payments.p2pkh({
       pubkey: child.publicKey,
       network: dogecoinNetwork
     });
 
-    // Encode uncompressed WIF private key
+    // MANUAL ENCODE Uncompressed WIF
     const privateKeyBuffer = child.privateKey;
-    const wifKey = wif.encode(dogecoinNetwork.wif, privateKeyBuffer, false);  // false = uncompressed
+
+    // Encode with compressed flag = false
+    const wifKey = wif.encode(dogecoinNetwork.wif, privateKeyBuffer, false);
 
     res.status(200).json({
       mnemonic,
