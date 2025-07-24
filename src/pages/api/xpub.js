@@ -1,5 +1,5 @@
 // pages/api/derive-from-xpub.js
-import ecc from '@noble/secp256k1';
+import ecc from '@bitcoinerlab/secp256k1';
 import { addressFromExtPubKey, Purpose } from '@swan-bitcoin/xpub-lib';
 
 
