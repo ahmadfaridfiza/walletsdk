@@ -1,8 +1,8 @@
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
-import { WalletContractV3R2 } from '@ton/ton';
+import { WalletContractV3 } from '@ton/ton';
 import { Buffer } from 'buffer';
 
-global.Buffer = Buffer;  // Polyfill Next.js
+global.Buffer = Buffer;  // Polyfill
 
 export default async function handler(req, res) {
   try {
@@ -11,8 +11,8 @@ export default async function handler(req, res) {
 
     const keyPair = await mnemonicToPrivateKey(mnemonicArray);
 
-    // Generate Wallet V3R2 (Tonkeeper default)
-    const wallet = WalletContractV3R2.create({
+    // Generate WalletContractV3 (Default Wallet Type)
+    const wallet = WalletContractV3.create({
       workchain: 0,
       publicKey: keyPair.publicKey
     });
