@@ -1,5 +1,5 @@
 import * as bip39 from 'bip39';
-import hdkey from 'ethereumjs-wallet/hdkey';
+import { hdkey } from 'ethereumjs-wallet';
 import { ethers } from 'ethers';
 
 export default async function handler(req, res) {
