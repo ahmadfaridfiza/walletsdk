@@ -1,42 +1,48 @@
 const bip39 = require('bip39');
 const bitcoin = require('bitcoinjs-lib');
 const ecc = require('tiny-secp256k1');
-const {BIP32Factory} = require('bip32');
+const { BIP32Factory } = require('bip32');
 const bip32 = BIP32Factory(ecc);
-const strength = 128; // Strength in bits, 128 bits results in a 12-word phrase
-const mnemonic = bip39.generateMnemonic(strength);
 
+const dogecoinNetwork = {
+  messagePrefix: '\x19Dogecoin Signed Message:\n',
+  bech32: null, // Dogecoin does not use bech32
+  bip32: {
+    public: 0x02facafd,
+    private: 0x02fac398,
+  },
+  pubKeyHash: 0x1e,  // Addresses start with 'D'
+  scriptHash: 0x16,  // Addresses starting with '9'
+  wif: 0x9e          // WIF starting with '6'
+};
 
 export default async function handler(req, res) {
   try {
-    const seedPhrase = mnemonic;
+    const strength = 128; // 12-word mnemonic
+    const mnemonic = bip39.generateMnemonic(strength);
 
-const seedBuffer = bip39.mnemonicToSeedSync(seedPhrase);
+    // Convert mnemonic to seed buffer
+    const seedBuffer = bip39.mnemonicToSeedSync(mnemonic);
 
-const rootNode = bip32.fromSeed(seedBuffer, bitcoin.networks.dogecoin);
+    // Derive root node from seed (no need to pass network)
+    const rootNode = bip32.fromSeed(seedBuffer);
 
-// Derive an address from the HD wallet
-const addressNode = rootNode.derivePath("m/44'/3'/0'/0/0");
-const publicKey = addressNode.publicKey;
+    // Derive address path (Dogecoin BIP44 path: m/44'/3'/0'/0/0)
+    const addressNode = rootNode.derivePath("m/44'/3'/0'/0/0");
 
-const dogecoinNetwork = {
-	messagePrefix: '\x19Dogecoin Signed Message:\n',
-	bip32: {
-		public: 0x02facafd, // This value corresponds to the public key prefix for Dogecoin
-		private: 0x02fac398, // This value corresponds to the private key prefix for Dogecoin
-	},
-	pubKeyHash: 0x1e, // This value corresponds to the public key hash prefix for Dogecoin (30 in decimal)
-	scriptHash: 0x16, // This value corresponds to the script hash prefix for Dogecoin (22 in decimal)
-	wif: 0x9e, // This value corresponds to the WIF prefix for Dogecoin (158 in decimal)
-};
+    // Generate Dogecoin address (P2PKH)
+    const { address } = bitcoin.payments.p2pkh({
+      pubkey: addressNode.publicKey,
+      network: dogecoinNetwork,
+    });
 
-const dogecoinAddress = bitcoin.payments.p2pkh({
-	pubkey: publicKey,
-	network: dogecoinNetwork,
-});
+    // Generate WIF Private Key
+    const wif = addressNode.toWIF();
 
     res.status(200).json({
-      dogecoinAddress
+      mnemonic,
+      privateKey: wif,
+      address
     });
   } catch (error) {
     console.error('Error:', error);
