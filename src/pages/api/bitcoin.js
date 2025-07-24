@@ -1,7 +1,7 @@
 import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
 import { bech32m } from 'bech32';
-import { utils, getPublicKey, schnorr } from '@noble/secp256k1';
+import { getPublicKey, utils } from '@noble/secp256k1';
 
 export default async function handler(req, res) {
   try {
@@ -18,18 +18,21 @@ export default async function handler(req, res) {
 
     // Get x-only public key
     const pubkey = getPublicKey(child.privateKey, true);
-    const xOnlyPubkey = pubkey.slice(1); // 32 bytes
+    const xOnlyPubkey = pubkey.slice(1);
 
     // Compute tweak (SHA256 of xOnlyPubkey)
     const tweakHash = await utils.sha256(xOnlyPubkey);
     const tweakBN = BigInt('0x' + Buffer.from(tweakHash).toString('hex'));
     const privKeyBN = BigInt('0x' + child.privateKey.toString('hex'));
 
-    const n = schnorr.CURVE.n;
+    // Curve Order n (secp256k1)
+    const n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+
+    // Tweak private key (privKey + tweak mod n)
     const tweakedPrivKey = (privKeyBN + tweakBN) % n;
 
-    const tweakedPrivKeyBytes = tweakedPrivKey.toString(16).padStart(64, '0');
-    const tweakedPubkey = getPublicKey(tweakedPrivKeyBytes, true).slice(1);
+    const tweakedPrivKeyHex = tweakedPrivKey.toString(16).padStart(64, '0');
+    const tweakedPubkey = getPublicKey(tweakedPrivKeyHex, true).slice(1);
 
     // Encode Taproot address (bc1p...)
     const words = bech32m.toWords(Buffer.concat([Buffer.from([0x01]), Buffer.from(tweakedPubkey)]));
