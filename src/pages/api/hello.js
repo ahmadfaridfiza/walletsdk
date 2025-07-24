@@ -6,20 +6,22 @@ export default async function handler(req, res) {
     const mnemonic = bip39.generateMnemonic(128);
     const derivationPath = "m/44'/637'/0'/0'/0'";
 
+    // Derive Account from Mnemonic & Path
     const account = Account.fromDerivationPath({
       mnemonic,
       path: derivationPath,
     });
 
-    const privateKeyHex = Buffer
-      .from(account.signingKey.secretKey)
-      .toString("hex")
-      .slice(0, 64);
+    // Get Private Key (HEX)
+    const privateKeyHex = account.privateKey.toString();
+
+    // Get Public Address
+    const address = account.accountAddress.toString();
 
     res.status(200).json({
       mnemonic,
-      address: account.accountAddress.toString(),
-      privateKey: privateKeyHex
+      privateKey: privateKeyHex,
+      address
     });
   } catch (error) {
     console.error(error);
