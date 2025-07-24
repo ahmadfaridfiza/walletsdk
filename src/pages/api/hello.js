@@ -1,20 +1,22 @@
-import { AptosAccount, Ed25519PrivateKey } from "aptos";
+export const config = {
+  runtime: 'nodejs'
+};
+
+import { Account, deriveAccount } from "@aptos-labs/ts-sdk";
 import bip39 from "bip39";
-import { derivePath } from "ed25519-hd-key";
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   const mnemonic = bip39.generateMnemonic();
-  const seed = bip39.mnemonicToSeedSync(mnemonic);
 
-  const path = "m/44'/637'/0'/0'/0'";
-  const { key } = derivePath(path, seed.toString('hex'));
-
-  const privateKey = new Ed25519PrivateKey(Buffer.from(key, 'hex'));
-  const account = AptosAccount.fromPrivateKey(privateKey);
+  // Derive Account using Aptos official SDK derivation path m/44'/637'/0'/0'/0'
+  const account = await deriveAccount({
+    mnemonic,
+    derivationPath: "m/44'/637'/0'/0'/0'"
+  });
 
   res.status(200).json({
     mnemonic,
-    privateKey: account.signingKey.secretKey.toString('hex').slice(0, 64),
-    address: account.address().toString()
+    privateKey: account.privateKeyHex,
+    address: account.accountAddress.toString()
   });
 }
