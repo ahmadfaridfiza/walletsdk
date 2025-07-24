@@ -2,29 +2,37 @@ import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
 import { BIP32Factory } from 'bip32';
 import ecc from 'tiny-secp256k1';
-import { payments } from '@dogiwallet/dogecoinjs-lib';
 
 const bip32 = BIP32Factory(ecc);
 
+// Define Dogecoin Network Parameters
+const dogecoinNetwork = {
+  messagePrefix: '\x19Dogecoin Signed Message:\n',
+  bech32: null,
+  bip32: {
+    public: 0x02facafd,
+    private: 0x02fac398
+  },
+  pubKeyHash: 0x1e,  // Address Prefix 'D'
+  scriptHash: 0x16,
+  wif: 0x9e
+};
+
 export default async function handler(req, res) {
   try {
-    const mnemonic = bip39.generateMnemonic(128);       // 12 kata
-    const seed = await bip39.mnemonicToSeed(mnemonic);  // seed BIP39
+    const mnemonic = bip39.generateMnemonic(128);
+    const seed = await bip39.mnemonicToSeed(mnemonic);
+    const root = bip32.fromSeed(seed, dogecoinNetwork);
 
-    const root = bip32.fromSeed(seed, bitcoin.networks.dogecoin);  // DNS network Doge
-
-    // Standard derivation m/44'/3'/0'/0/0 untuk Dogecoin :contentReference[oaicite:5]{index=5}
-    const path = "m/44'/3'/0'/0/0";
+    const path = "m/44'/3'/0'/0/0";  // Dogecoin BIP44 path
     const child = root.derivePath(path);
 
-    // Private key WIF
-    const wif = child.toWIF();
-
-    // Dogecoin P2PKH address
-    const { address } = payments.p2pkh({
+    const { address } = bitcoin.payments.p2pkh({
       pubkey: child.publicKey,
-      network: bitcoin.networks.dogecoin
+      network: dogecoinNetwork
     });
+
+    const wif = child.toWIF();
 
     res.status(200).json({
       mnemonic,
