@@ -1,8 +1,7 @@
-
 import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
 import { bech32m } from 'bech32';
-import * as crypto from 'crypto';
+import { utils, getPublicKey, schnorr } from '@noble/secp256k1';
 
 export default async function handler(req, res) {
   try {
@@ -12,72 +11,32 @@ export default async function handler(req, res) {
     const network = bitcoin.networks.bitcoin;
     const root = bitcoin.bip32.fromSeed(seed, network);
 
-    const deriveLegacyAddress = (path) => {
-      const child = root.derivePath(path);
-      const payment = bitcoin.payments.p2pkh({ pubkey: child.publicKey, network });
-      return {
-        path,
-        address: payment.address,
-        privateKey: child.toWIF()
-      };
-    };
+    const path = "m/86'/0'/0'/0/0";
+    const child = root.derivePath(path);
 
-    const deriveSegwitP2SH = (path) => {
-      const child = root.derivePath(path);
-      const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
-      const payment = bitcoin.payments.p2sh({ redeem: p2wpkh, network });
-      return {
-        path,
-        address: payment.address,
-        privateKey: child.toWIF()
-      };
-    };
+    if (!child.privateKey) throw new Error('Failed to derive private key.');
 
-    const deriveNativeSegwit = (path) => {
-      const child = root.derivePath(path);
-      const payment = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
-      return {
-        path,
-        address: payment.address,
-        privateKey: child.toWIF()
-      };
-    };
+    // Get x-only public key (32 bytes)
+    const xOnlyPubkey = getPublicKey(child.privateKey, true).slice(1);
 
-    const deriveTaproot = (path) => {
-      const child = root.derivePath(path);
-      const xOnlyPubkey = child.publicKey.slice(1, 33);
-      const tweakHash = crypto.createHash('sha256').update(xOnlyPubkey).digest();
+    // Tweak the xOnlyPubkey: tweakedKey = xOnlyPubkey + H(P)
+    const tweakedKey = schnorr.tapTweakPrivateKey(child.privateKey);
 
-      let tweakedPubkey = Buffer.from(xOnlyPubkey);
-      for (let i = 0; i < 32; i++) {
-        tweakedPubkey[i] = (tweakedPubkey[i] + tweakHash[i]) % 256;
-      }
+    // Derive tweaked public key
+    const tweakedPubkey = getPublicKey(tweakedKey, true).slice(1);
 
-      const words = bech32m.toWords(Buffer.concat([Buffer.from([0x01]), tweakedPubkey]));
-      const address = bech32m.encode('bc', words);
-
-      return {
-        path,
-        address,
-        privateKey: child.toWIF()
-      };
-    };
-
-    const bip44 = deriveLegacyAddress("m/44'/0'/0'/0/0");
-    const bip49 = deriveSegwitP2SH("m/49'/0'/0'/0/0");
-    const bip84 = deriveNativeSegwit("m/84'/0'/0'/0/0");
-    const bip86 = deriveTaproot("m/86'/0'/0'/0/0");
+    // Encode bc1p address
+    const words = bech32m.toWords(Buffer.concat([Buffer.from([0x01]), Buffer.from(tweakedPubkey)]));
+    const address = bech32m.encode('bc', words);
 
     res.status(200).json({
       mnemonic,
-      bip44,
-      bip49,
-      bip84,
-      bip86
+      path,
+      address, // <-- This will be bc1p...
+      privateKey: child.toWIF()
     });
   } catch (error) {
-    console.error('Bitcoin Wallet Generation Error:', error);
+    console.error('Taproot BIP86 Generation Error:', error);
     res.status(500).json({ error: error.message });
   }
 }
-
