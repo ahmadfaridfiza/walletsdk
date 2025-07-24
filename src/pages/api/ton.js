@@ -1,21 +1,24 @@
-import { mnemonicNew, mnemonicToPrivateKey, WalletContractV4 } from '@ton/ton';
-import * as bip39 from 'bip39';
+import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
+import { WalletContractV4 } from '@ton/ton';
+import { Buffer } from 'buffer';
+
+global.Buffer = Buffer;  // Polyfill untuk Browser/Next.js
 
 export default async function handler(req, res) {
   try {
     // Generate 24-word mnemonic
-    const mnemonic = await mnemonicNew(24);
+    const mnemonic = await mnemonicNew();
 
-    // Derive key pair from mnemonic
+    // Derive Private Key from mnemonic
     const keyPair = await mnemonicToPrivateKey(mnemonic);
 
-    // Generate Wallet V4 (standard Tonkeeper wallet)
+    // Create Wallet Contract V4 (standard Tonkeeper wallet)
     const wallet = WalletContractV4.create({
       workchain: 0,
       publicKey: keyPair.publicKey
     });
 
-    // Get address string (bounceable = false for external wallets)
+    // Get Wallet Address (Non-bounceable format)
     const address = wallet.address.toString({ bounceable: false });
 
     // Private Key (Hex)
