@@ -1,5 +1,7 @@
 // pages/api/derive-from-xpub.js
+import ecc from '@noble/secp256k1';
 import { addressFromExtPubKey, Purpose } from '@swan-bitcoin/xpub-lib';
+
 
 export default async function handler(req, res) {
   try {
@@ -12,7 +14,6 @@ export default async function handler(req, res) {
     // Derive P2SH-SegWit (BIP49)
     const p2sh = await addressFromExtPubKey({ extPubKey: key, network: 'mainnet', purpose: Purpose.P2SH });
     // Derive Taproot (BIP86)
-    const ecc = require('@noble/secp256k1')
     initEccLib(ecc)
     const taproot = await addressFromExtPubKey({ extPubKey: key, network: 'mainnet', purpose: Purpose.P2TR });
 
