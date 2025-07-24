@@ -1,5 +1,7 @@
 import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
+import * as tinysecp from 'tiny-secp256k1';
+import { bech32m } from 'bech32';
 
 export default async function handler(req, res) {
   try {
@@ -14,19 +16,27 @@ export default async function handler(req, res) {
       if (!child.privateKey) throw new Error(`Failed to derive private key for ${type}`);
 
       let payment;
-      switch (type) {
-        case 'BIP44':
-          payment = bitcoin.payments.p2pkh({ pubkey: child.publicKey, network });
-          break;
-        case 'BIP49':
-          const p2wpkh49 = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
-          payment = bitcoin.payments.p2sh({ redeem: p2wpkh49, network });
-          break;
-        case 'BIP84':
-          payment = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
-          break;
-        default:
-          throw new Error('Unknown address type');
+      if (type === 'BIP44') {
+        payment = bitcoin.payments.p2pkh({ pubkey: child.publicKey, network });
+      } else if (type === 'BIP49') {
+        const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
+        payment = bitcoin.payments.p2sh({ redeem: p2wpkh, network });
+      } else if (type === 'BIP84') {
+        payment = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
+      } else if (type === 'BIP86') {
+        const xOnlyPubkey = child.publicKey.slice(1, 33); // Remove prefix byte (0x02/0x03)
+        const tweaked = tinysecp.xOnlyPointAddTweak(xOnlyPubkey, Buffer.alloc(32));
+        if (!tweaked || tweaked.parity === undefined) throw new Error('Invalid tweak');
+
+        const words = bech32m.toWords(Buffer.concat([Buffer.from([0x01]), tweaked.xOnlyPubkey]));
+        const address = bech32m.encode('bc', words);
+        return {
+          path,
+          address,
+          privateKey: child.toWIF()
+        };
+      } else {
+        throw new Error('Unknown address type');
       }
 
       return {
@@ -39,12 +49,14 @@ export default async function handler(req, res) {
     const bip44 = deriveAddress("m/44'/0'/0'/0/0", 'BIP44');
     const bip49 = deriveAddress("m/49'/0'/0'/0/0", 'BIP49');
     const bip84 = deriveAddress("m/84'/0'/0'/0/0", 'BIP84');
+    const bip86 = deriveAddress("m/86'/0'/0'/0/0", 'BIP86');
 
     res.status(200).json({
       mnemonic,
       bip44,
       bip49,
-      bip84
+      bip84,
+      bip86
     });
   } catch (error) {
     console.error('Bitcoin Wallet Generation Error:', error);
