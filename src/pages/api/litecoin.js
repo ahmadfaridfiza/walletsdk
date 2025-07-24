@@ -19,11 +19,10 @@ export default async function handler(req, res) {
     const mnemonic = bip39.generateMnemonic(128);
     const seed = await bip39.mnemonicToSeed(mnemonic);
 
-    // Use BIP32 HDNode from bitcoinjs-lib (no tiny-secp256k1)
     const root = bitcoin.bip32.fromSeed(seed);
 
-    // Derive Dogecoin BIP44 path m/44'/3'/0'/0/0
-    const child = root.derivePath("m/44'/2'/0'/0/0");
+    // Derive Litecoin BIP44 path m/84'/2'/0'/0/0
+    const child = root.derivePath("m/84'/2'/0'/0/0");
 
     const { address } = bitcoin.payments.p2pkh({
       pubkey: child.publicKey,
@@ -38,7 +37,7 @@ export default async function handler(req, res) {
       address
     });
   } catch (error) {
-    console.error('Dogecoin Wallet Generation Error:', error);
+    console.error('Litecoin Wallet Generation Error:', error);
     res.status(500).json({ error: error.message });
   }
 }
