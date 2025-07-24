@@ -2,23 +2,15 @@ import { Account, Aptos, AptosConfig, Network, SigningSchemeInput } from "@aptos
 
 export default async function handler(req, res) {
   try {
-    // Setup Aptos Client (MAINNET)
-    const config = new AptosConfig({ network: Network.MAINNET });
-    const aptos = new Aptos(config);
+    const privateKey = new Ed25519PrivateKey("myEd25519privatekeystring");
 
-    // Generate Account (Ed25519 Legacy, no mnemonic)
-    const account = Account.generate({
-      scheme: SigningSchemeInput.Ed25519,
-      legacy: true
-    });
-
-    // You CANNOT fund MAINNET accounts via faucet
-    // User must deposit manually from exchange or another wallet
+const aptos = new Aptos();
+const account = await aptos.deriveAccountFromPrivateKey({ privateKey });
 
     // Return JSON Response
     res.status(200).json({
-      address: account.accountAddress.toString(),
-      privateKey: account.privateKeyHex
+      address: account.toString(),
+      privateKey: privateKey
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
