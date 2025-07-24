@@ -1,11 +1,11 @@
 import * as bip39 from 'bip39';
-import * as bip32 from 'bip32';
+import { BIP32Factory } from 'bip32';
 import * as bitcoin from 'bitcoinjs-lib';
 import ecc from 'tiny-secp256k1';
 
-bip32.BIP32Factory(ecc);
+const bip32 = BIP32Factory(ecc);
 
-// Manual Dogecoin Network Parameters
+// Manual Dogecoin Network Params
 const dogecoinNetwork = {
   messagePrefix: '\x19Dogecoin Signed Message:\n',
   bech32: null,
@@ -22,9 +22,9 @@ export default async function handler(req, res) {
   try {
     const mnemonic = bip39.generateMnemonic(128);
     const seed = await bip39.mnemonicToSeed(mnemonic);
-
     const root = bip32.fromSeed(seed, dogecoinNetwork);
-    const path = "m/44'/3'/0'/0/0";
+
+    const path = "m/44'/3'/0'/0/0";  // BIP44 Doge
     const child = root.derivePath(path);
 
     const { address } = bitcoin.payments.p2pkh({
