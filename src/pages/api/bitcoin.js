@@ -1,6 +1,5 @@
 import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
-import * as tinysecp from 'tiny-secp256k1';
 import { bech32m } from 'bech32';
 
 export default async function handler(req, res) {
@@ -24,11 +23,9 @@ export default async function handler(req, res) {
       } else if (type === 'BIP84') {
         payment = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
       } else if (type === 'BIP86') {
-        const xOnlyPubkey = child.publicKey.slice(1, 33); // Remove prefix byte (0x02/0x03)
-        const tweaked = tinysecp.xOnlyPointAddTweak(xOnlyPubkey, Buffer.alloc(32));
-        if (!tweaked || tweaked.parity === undefined) throw new Error('Invalid tweak');
-
-        const words = bech32m.toWords(Buffer.concat([Buffer.from([0x01]), tweaked.xOnlyPubkey]));
+        const xOnlyPubkey = child.publicKey.slice(1, 33); // remove 0x02/0x03
+        const taprootScript = Buffer.concat([Buffer.from([0x01]), xOnlyPubkey]);
+        const words = bech32m.toWords(taprootScript);
         const address = bech32m.encode('bc', words);
         return {
           path,
