@@ -1,50 +1,44 @@
 import * as bip39 from 'bip39';
+import * as bitcoin from 'bitcoinjs-lib';
 import { ec as EC } from 'elliptic';
 import bs58check from 'bs58check';
 
 export default async function handler(req, res) {
   try {
-    const bip32Module = await import('bip32');
-    const bip32 = bip32Module.default || bip32Module;
-
     const keccakModule = await import('keccak');
     const keccak256 = keccakModule.default;
 
-    const ec = new EC('secp256k1');
-
+    // Generate mnemonic & seed
     const mnemonic = bip39.generateMnemonic(128);
     const seed = await bip39.mnemonicToSeed(mnemonic);
 
-    // Derive BIP32 Root Key
-    const root = bip32.fromSeed(seed);
+    // Use bitcoinjs-lib's BIP32
+    const root = bitcoin.bip32.fromSeed(seed);
 
-    // Derive Tron Path m/44'/195'/0'/0/0
+    // Derive Tron path m/44'/195'/0'/0/0
     const child = root.derivePath("m/44'/195'/0'/0/0");
+    if (!child.privateKey) throw new Error('Failed to derive private key.');
 
-    if (!child.privateKey) {
-      throw new Error('Failed to derive private key.');
-    }
-
+    // Derive public key
+    const ec = new EC('secp256k1');
     const keyPair = ec.keyFromPrivate(child.privateKey);
+    const publicKey = keyPair.getPublic(false, 'hex').slice(2); // uncompressed
 
-    // Get Public Key in Uncompressed Format
-    const publicKey = keyPair.getPublic(false, 'hex').slice(2);
-
-    // Keccak256 hash of public key, take last 20 bytes
+    // Keccak hash & Tron address
     const hash = keccak256('keccak256').update(Buffer.from(publicKey, 'hex')).digest();
-
     const tronAddressHex = Buffer.concat([Buffer.from('41', 'hex'), hash.slice(-20)]);
-    const tronAddressBase58 = bs58check.encode(tronAddressHex);
+    const address = bs58check.encode(tronAddressHex);
 
-    const privateKeyHex = child.privateKey.toString('hex');  // HEX format for TokenPocket Import
+    // Private key hex
+    const privateKeyHex = child.privateKey.toString('hex');
 
-    res.status(200).json({
+    return res.status(200).json({
       mnemonic,
       privateKey: privateKeyHex,
-      address: tronAddressBase58
+      address
     });
   } catch (error) {
     console.error('TRON Wallet Generation Error:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 }
