@@ -6,11 +6,17 @@ import { addressFromExtPubKey, Purpose, initEccLib } from '@swan-bitcoin/xpub-li
 
 export default async function handler(req, res) {
   try {
+    initEccLib(ecc);
+    
     const mnemonic = bip39.generateMnemonic(128);
     const seed = await bip39.mnemonicToSeed(mnemonic);
 
     const network = bitcoin.networks.bitcoin;
     const root = bitcoin.bip32.fromSeed(seed, network);
+
+    const child = root.derivePath("m/86'/0'/0'/0/0");
+
+    const privateKeyWIF = child.toWIF();
 
     // 2. Derive XPUBs for BIP44, BIP49, BIP84, BIP86
     const getXpub = (path) => {
@@ -30,10 +36,10 @@ export default async function handler(req, res) {
     // Derive P2SH-SegWit (BIP49)
     const p2sh = await addressFromExtPubKey({ extPubKey: xpub49, network: 'mainnet', purpose: Purpose.P2SH });
     // Derive Taproot (BIP86)
-    initEccLib(ecc);
+    
     const taproot = await addressFromExtPubKey({ extPubKey: xpub86, network: 'mainnet', purpose: Purpose.P2TR });
 
-    res.status(200).json({ mnemonic, bech32, p2pkh, p2sh, taproot });
+    res.status(200).json({ mnemonic, bech32, p2pkh, p2sh, taproot, privateKey: privateKeyWIF, });
   } catch (error) {
     console.error('Derivation error:', error);
     res.status(500).json({ error: error.message });
