@@ -1,6 +1,5 @@
 import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
-import * as litecoinjs from 'litecoinjs-lib'; // Optional if using litecoinjs-lib
 import ecc from '@bitcoinerlab/secp256k1';
 import { addressFromExtPubKey, Purpose, initEccLib } from '@swan-bitcoin/xpub-lib';
 
