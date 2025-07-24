@@ -2,17 +2,16 @@ import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
 
 const litecoinNetwork = {
-      messagePrefix: '\x19Litecoin Signed Message:\n',
-      bech32: 'ltc',
-      bip32: {
-        public: 0x019da462,
-        private: 0x019d9cfe,
-      },
-      pubKeyHash: 0x30, // Addresses start with 'L'
-      scriptHash: 0x32,  // Addresses start with 'M' (BIP49 P2SH)
-      wif: 0xb0,
-    };
-
+  messagePrefix: '\x19Litecoin Signed Message:\n',
+  bech32: 'ltc',
+  bip32: {
+    public: 0x019da462,
+    private: 0x019d9cfe,
+  },
+  pubKeyHash: 0x30,  // L addresses (P2PKH)
+  scriptHash: 0x32,  // M addresses (P2SH)
+  wif: 0xb0,         // WIF prefix (Litecoin)
+};
 
 export default async function handler(req, res) {
   try {
@@ -22,21 +21,22 @@ export default async function handler(req, res) {
     const root = bitcoin.bip32.fromSeed(seed, litecoinNetwork);
 
     const deriveAddress = (path, type) => {
-      const child = root.derivePath(path);
-    let payment;
+      const childNode = root.derivePath(path);
+
+      let payment;
       if (type === 'BIP44') {
-        payment = bitcoin.payments.p2pkh({ pubkey: child.publicKey, network: litecoinNetwork });
+        payment = bitcoin.payments.p2pkh({ pubkey: childNode.publicKey, network: litecoinNetwork });
       } else if (type === 'BIP49') {
-        const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network: litecoinNetwork });
+        const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: childNode.publicKey, network: litecoinNetwork });
         payment = bitcoin.payments.p2sh({ redeem: p2wpkh, network: litecoinNetwork });
       } else if (type === 'BIP84') {
-        payment = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network: litecoinNetwork });
+        payment = bitcoin.payments.p2wpkh({ pubkey: childNode.publicKey, network: litecoinNetwork });
       }
 
       return {
         path,
         address: payment.address,
-        privateKey: child.toWIF()
+        privateKey: childNode.toWIF(),
       };
     };
 
@@ -44,11 +44,8 @@ export default async function handler(req, res) {
     const bip49 = deriveAddress("m/49'/2'/0'/0/0", 'BIP49');
     const bip84 = deriveAddress("m/84'/2'/0'/0/0", 'BIP84');
 
-    const privateKeyWIF = child.toWIF();
-
     res.status(200).json({
       mnemonic,
-      privateKey: privateKeyWIF,
       bip44,
       bip49,
       bip84
