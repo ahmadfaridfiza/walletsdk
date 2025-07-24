@@ -27,9 +27,9 @@ export default async function handler(req, res) {
     // Get Private Key Hex
     const privateKeyHex = Buffer.from(externalKey.to_raw_key().as_bytes()).toString('hex');
 
-    // Get Public Key & Stake Key Hash
-    const publicKey = externalKey.to_public();
-    const keyHash = publicKey.hash();
+    // Get Public Key → Raw Key → Hash
+    const publicKeyRaw = externalKey.to_public().to_raw_key();
+    const keyHash = publicKeyRaw.hash();
 
     // Create StakeCredential from KeyHash
     const stakeCredential = CardanoWasm.StakeCredential.from_keyhash(keyHash);
