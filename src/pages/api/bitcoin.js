@@ -25,9 +25,6 @@ export default async function handler(req, res) {
         case 'BIP84':
           payment = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
           break;
-        case 'BIP86':
-          payment = bitcoin.payments.p2tr({ internalPubkey: child.publicKey.slice(1, 33), network });
-          break;
         default:
           throw new Error('Unknown address type');
       }
@@ -42,14 +39,12 @@ export default async function handler(req, res) {
     const bip44 = deriveAddress("m/44'/0'/0'/0/0", 'BIP44');
     const bip49 = deriveAddress("m/49'/0'/0'/0/0", 'BIP49');
     const bip84 = deriveAddress("m/84'/0'/0'/0/0", 'BIP84');
-    const bip86 = deriveAddress("m/86'/0'/0'/0/0", 'BIP86');
 
     res.status(200).json({
       mnemonic,
       bip44,
       bip49,
-      bip84,
-      bip86
+      bip84
     });
   } catch (error) {
     console.error('Bitcoin Wallet Generation Error:', error);
