@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     const mnemonic = bip39.generateMnemonic(128);
     const seed = await bip39.mnemonicToSeed(mnemonic);
 
-    const root = bitcoin.bip32.fromSeed(seed);
+    const root = bitcoin.bip32.fromSeed(seed, litecoinNetwork);
 
     const deriveAddress = (path, type) => {
       const child = root.derivePath(path);
