@@ -1,6 +1,8 @@
+
 import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
 import { bech32m } from 'bech32';
+import * as crypto from 'crypto';
 
 export default async function handler(req, res) {
   try {
@@ -10,53 +12,40 @@ export default async function handler(req, res) {
     const network = bitcoin.networks.bitcoin;
     const root = bitcoin.bip32.fromSeed(seed, network);
 
-    const deriveAddress = (path, type) => {
-      const child = root.derivePath(path);
-      if (!child.privateKey) throw new Error(`Failed to derive private key for ${type}`);
+    // BIP86 path
+    const path = "m/86'/0'/0'/0/0";
+    const child = root.derivePath(path);
 
-      let payment;
-      if (type === 'BIP44') {
-        payment = bitcoin.payments.p2pkh({ pubkey: child.publicKey, network });
-      } else if (type === 'BIP49') {
-        const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
-        payment = bitcoin.payments.p2sh({ redeem: p2wpkh, network });
-      } else if (type === 'BIP84') {
-        payment = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network });
-      } else if (type === 'BIP86') {
-        const xOnlyPubkey = child.publicKey.slice(1, 33); // remove 0x02/0x03
-        const taprootScript = Buffer.concat([Buffer.from([0x01]), xOnlyPubkey]);
-        const words = bech32m.toWords(taprootScript);
-        const address = bech32m.encode('bc', words);
-        return {
-          path,
-          address,
-          privateKey: child.toWIF()
-        };
-      } else {
-        throw new Error('Unknown address type');
-      }
+    if (!child.privateKey) {
+      throw new Error('Failed to derive private key.');
+    }
 
-      return {
-        path,
-        address: payment.address,
-        privateKey: child.toWIF()
-      };
-    };
+    // Get x-only public key
+    const publicKey = child.publicKey;
+    const xOnlyPubkey = publicKey.slice(1, 33);
 
-    const bip44 = deriveAddress("m/44'/0'/0'/0/0", 'BIP44');
-    const bip49 = deriveAddress("m/49'/0'/0'/0/0", 'BIP49');
-    const bip84 = deriveAddress("m/84'/0'/0'/0/0", 'BIP84');
-    const bip86 = deriveAddress("m/86'/0'/0'/0/0", 'BIP86');
+    // Tweak = SHA256(xOnlyPubkey)
+    const tweakHash = crypto.createHash('sha256').update(xOnlyPubkey).digest();
+
+    // Tweak the xOnlyPubkey (simple add mod n)
+    let tweakedPubkey = Buffer.from(xOnlyPubkey);
+    for (let i = 0; i < 32; i++) {
+      tweakedPubkey[i] = (tweakedPubkey[i] + tweakHash[i]) % 256;
+    }
+
+    // Encode Taproot Address (bc1p...)
+    const words = bech32m.toWords(Buffer.concat([Buffer.from([0x01]), tweakedPubkey]));
+    const address = bech32m.encode('bc', words);
 
     res.status(200).json({
       mnemonic,
-      bip44,
-      bip49,
-      bip84,
-      bip86
+      path,
+      address,
+      privateKey: child.toWIF()
     });
   } catch (error) {
-    console.error('Bitcoin Wallet Generation Error:', error);
+    console.error('BIP86 Taproot Generation Error:', error);
     res.status(500).json({ error: error.message });
   }
 }
+
