@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     // Derive P2SH-SegWit (BIP49)
     const p2sh = await addressFromExtPubKey({ extPubKey: key, network: 'mainnet', purpose: Purpose.P2SH });
     // Derive Taproot (BIP86)
-    initEccLib(ecc)
+    initEccLib(ecc);
     const taproot = await addressFromExtPubKey({ extPubKey: key, network: 'mainnet', purpose: Purpose.P2TR });
 
     res.status(200).json({ bech32, p2pkh, p2sh, taproot });
