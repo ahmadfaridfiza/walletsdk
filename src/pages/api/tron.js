@@ -1,12 +1,17 @@
 import * as bip39 from 'bip39';
-import * as bip32 from 'bip32';
 import { ec as EC } from 'elliptic';
 import bs58check from 'bs58check';
 
-const ec = new EC('secp256k1');
-
 export default async function handler(req, res) {
   try {
+    const bip32Module = await import('bip32');
+    const bip32 = bip32Module.default || bip32Module;
+
+    const keccakModule = await import('keccak');
+    const keccak256 = keccakModule.default;
+
+    const ec = new EC('secp256k1');
+
     const mnemonic = bip39.generateMnemonic(128);
     const seed = await bip39.mnemonicToSeed(mnemonic);
 
@@ -25,8 +30,7 @@ export default async function handler(req, res) {
     // Get Public Key in Uncompressed Format
     const publicKey = keyPair.getPublic(false, 'hex').slice(2);
 
-    // Tron Address = Keccak256(publicKey) → Take last 20 bytes → Add 0x41 prefix → Base58Check Encode
-    const keccak256 = (await import('keccak')).default;
+    // Keccak256 hash of public key, take last 20 bytes
     const hash = keccak256('keccak256').update(Buffer.from(publicKey, 'hex')).digest();
 
     const tronAddressHex = Buffer.concat([Buffer.from('41', 'hex'), hash.slice(-20)]);
