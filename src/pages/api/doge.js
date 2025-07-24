@@ -1,5 +1,6 @@
 import * as bip39 from 'bip39';
 import * as bitcoin from 'bitcoinjs-lib';
+import wif from 'wif';  // ADD THIS
 
 const dogecoinNetwork = {
   messagePrefix: '\x19Dogecoin Signed Message:\n',
@@ -9,7 +10,7 @@ const dogecoinNetwork = {
   },
   pubKeyHash: 0x1e,
   scriptHash: 0x16,
-  wif: 0x9e
+  wif: 0x9e  // Important
 };
 
 export default async function handler(req, res) {
@@ -17,22 +18,22 @@ export default async function handler(req, res) {
     const mnemonic = bip39.generateMnemonic(128);
     const seed = await bip39.mnemonicToSeed(mnemonic);
 
-    // Use BIP32 HDNode from bitcoinjs-lib (no tiny-secp256k1)
     const root = bitcoin.bip32.fromSeed(seed);
-
-    // Derive Dogecoin BIP44 path m/44'/3'/0'/0/0
     const child = root.derivePath("m/44'/3'/0'/0/0");
 
+    // Address generation (compressed publicKey)
     const { address } = bitcoin.payments.p2pkh({
       pubkey: child.publicKey,
       network: dogecoinNetwork
     });
 
-    const privateKeyWIF = child.toWIF();
+    // MANUALLY ENCODE UNCOMPRESSED PRIVATE KEY (TokenPocket Compatible)
+    const privateKeyBuffer = child.privateKey;
+    const wifKey = wif.encode(dogecoinNetwork.wif, privateKeyBuffer, false);  // false = uncompressed
 
     res.status(200).json({
       mnemonic,
-      privateKey: privateKeyWIF,
+      privateKey: wifKey,
       address
     });
   } catch (error) {
