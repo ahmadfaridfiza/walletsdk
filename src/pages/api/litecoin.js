@@ -21,20 +21,37 @@ export default async function handler(req, res) {
 
     const root = bitcoin.bip32.fromSeed(seed);
 
-    // Derive Litecoin BIP44 path m/84'/2'/0'/0/0
-    const child = root.derivePath("m/84'/2'/0'/0/0");
+    const deriveAddress = (path, type) => {
+      const child = root.derivePath(path);
+    let payment;
+      if (type === 'BIP44') {
+        payment = bitcoin.payments.p2pkh({ pubkey: child.publicKey, network: litecoinNetwork });
+      } else if (type === 'BIP49') {
+        const p2wpkh = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network: litecoinNetwork });
+        payment = bitcoin.payments.p2sh({ redeem: p2wpkh, network: litecoinNetwork });
+      } else if (type === 'BIP84') {
+        payment = bitcoin.payments.p2wpkh({ pubkey: child.publicKey, network: litecoinNetwork });
+      }
 
-    const { address } = bitcoin.payments.p2pkh({
-      pubkey: child.publicKey,
-      network: litecoinNetwork
-    });
+      return {
+        path,
+        address: payment.address,
+        privateKey: child.toWIF()
+      };
+    };
+
+    const bip44 = deriveAddress("m/44'/2'/0'/0/0", 'BIP44');
+    const bip49 = deriveAddress("m/49'/2'/0'/0/0", 'BIP49');
+    const bip84 = deriveAddress("m/84'/2'/0'/0/0", 'BIP84');
 
     const privateKeyWIF = child.toWIF();
 
     res.status(200).json({
       mnemonic,
       privateKey: privateKeyWIF,
-      address
+      bip44,
+      bip49,
+      bip84
     });
   } catch (error) {
     console.error('Litecoin Wallet Generation Error:', error);
