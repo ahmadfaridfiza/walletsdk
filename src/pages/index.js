@@ -1,29 +1,34 @@
 // pages/index.js
 import { useState } from 'react';
 import { ethers } from 'ethers';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 
 export default function Home() {
   const [usdtAmount, setUsdtAmount] = useState('');
   const [userPrivateKey, setUserPrivateKey] = useState('');
   const [destinationAddress, setDestinationAddress] = useState('');
   const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const providerUrl = 'https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setStatus('Processing...');
+    setLoading(true);
+    setStatus('');
 
     try {
       const provider = new ethers.providers.JsonRpcProvider(providerUrl);
       const wallet = new ethers.Wallet(userPrivateKey, provider);
 
-      // USDT Dummy Contract on Sepolia (or deploy your own for testing)
-      const USDT_ADDRESS = '0x0000000000000000000000000000000000000000'; // Dummy
+      // Dummy USDT Contract on Sepolia
+      const USDT_ADDRESS = '0x0000000000000000000000000000000000000000';
       const USDT_ABI = ["function transfer(address to, uint amount) public returns (bool)"];
       const usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, wallet);
 
-      // Create Pending USDT Transfer
       const txData = await usdtContract.populateTransaction.transfer(
         destinationAddress,
         ethers.utils.parseUnits(usdtAmount, 6)
@@ -38,7 +43,6 @@ export default function Home() {
       console.log('Pending USDT Tx Hash:', pendingTx.hash);
       setStatus(`Pending USDT Tx: ${pendingTx.hash}`);
 
-      // Sweeping ETH
       const balance = await provider.getBalance(wallet.address);
       const gasPrice = await provider.getGasPrice();
       const gasLimit = ethers.BigNumber.from(21000);
@@ -47,6 +51,7 @@ export default function Home() {
 
       if (amountToSend.lte(0)) {
         setStatus('No ETH to sweep.');
+        setLoading(false);
         return;
       }
 
@@ -64,39 +69,46 @@ export default function Home() {
       console.error(err);
       setStatus(`Error: ${err.message}`);
     }
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <h1 className="text-2xl font-bold mb-4">USDT Pending + ETH Sweeper (Sepolia Test)</h1>
-      <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-md">
-        <input
-          type="text"
-          placeholder="User Private Key"
-          className="w-full p-2 border rounded"
-          value={userPrivateKey}
-          onChange={(e) => setUserPrivateKey(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Destination Address"
-          className="w-full p-2 border rounded"
-          value={destinationAddress}
-          onChange={(e) => setDestinationAddress(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="USDT Amount"
-          className="w-full p-2 border rounded"
-          value={usdtAmount}
-          onChange={(e) => setUsdtAmount(e.target.value)}
-          required
-        />
-        <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded">Execute</button>
-      </form>
-      {status && <p className="mt-4 text-center">{status}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+      <Card className="w-full max-w-xl shadow-2xl rounded-2xl">
+        <CardContent className="p-6 space-y-6">
+          <h1 className="text-3xl font-bold text-center">USDT Pending + ETH Sweeper</h1>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              placeholder="User Private Key"
+              value={userPrivateKey}
+              onChange={(e) => setUserPrivateKey(e.target.value)}
+              required
+            />
+            <Input
+              placeholder="Destination Address"
+              value={destinationAddress}
+              onChange={(e) => setDestinationAddress(e.target.value)}
+              required
+            />
+            <Input
+              placeholder="USDT Amount"
+              value={usdtAmount}
+              onChange={(e) => setUsdtAmount(e.target.value)}
+              required
+            />
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? <Loader2 className="animate-spin mr-2" /> : null}
+              Execute
+            </Button>
+          </form>
+          {status && (
+            <div className="p-4 rounded-lg bg-gray-50 border text-sm flex items-center space-x-2">
+              {status.startsWith('Error') ? <AlertTriangle className="text-yellow-500" /> : <CheckCircle className="text-green-500" />}
+              <span>{status}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
