@@ -1,4 +1,5 @@
-import { chromium } from 'playwright-core';
+import { chromium as playwrightChromium } from 'playwright-core';
+import chromium from '@sparticuz/chromium';
 
 export default async function handler(req, res) {
   // CORS
@@ -14,15 +15,17 @@ export default async function handler(req, res) {
 
   let browser = null;
   try {
-    browser = await chromium.launch({
+    // Launch serverless-ready Chromium
+    browser = await playwrightChromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'], // wajib di Vercel
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
     });
 
     const page = await browser.newPage();
     await page.goto(shortlink, { waitUntil: 'networkidle', timeout: 30000 });
 
-    const realUrl = page.url(); // ini URL setelah JS redirect
+    const realUrl = page.url(); // URL setelah JS redirect
     await browser.close();
 
     res.json({ realUrl });
