@@ -32,7 +32,6 @@
     "ethers": "^5.7.2",
     "keccak": "^3.0.4",
     "next": "15.4.3",
-    "puppeteer": "^24.16.2",
     "puppeteer-core": "^10.4.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
