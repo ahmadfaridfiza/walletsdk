@@ -1,4 +1,5 @@
-import puppeteer from "puppeteer";
+import chromium from 'chrome-aws-lambda';
+import puppeteer from 'puppeteer-core';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -6,7 +7,6 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-
   if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
 
   const { shortlink } = req.body;
@@ -15,9 +15,12 @@ export default async function handler(req, res) {
   let browser = null;
   try {
     browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless,
     });
+
     const page = await browser.newPage();
     await page.goto(shortlink, { waitUntil: 'networkidle2', timeout: 30000 });
 
