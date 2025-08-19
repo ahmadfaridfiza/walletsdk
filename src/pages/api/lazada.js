@@ -1,4 +1,4 @@
-import axios from "axios";
+import { chromium } from 'playwright-core';
 
 export default async function handler(req, res) {
   // CORS
@@ -12,17 +12,23 @@ export default async function handler(req, res) {
   const { shortlink } = req.body;
   if (!shortlink) return res.status(400).json({ error: "Shortlink kosong" });
 
+  let browser = null;
   try {
-    const response = await axios.get(shortlink, {
-      maxRedirects: 10,         // ikuti redirect sampai 10 kali
-      validateStatus: null,     // supaya status 3xx tidak error
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'], // wajib di Vercel
     });
 
-    // response.request.res.responseUrl kadang undefined, fallback ke shortlink
-    const realUrl = response.request?.res?.responseUrl || shortlink;
+    const page = await browser.newPage();
+    await page.goto(shortlink, { waitUntil: 'networkidle', timeout: 30000 });
+
+    const realUrl = page.url(); // ini URL setelah JS redirect
+    await browser.close();
 
     res.json({ realUrl });
+
   } catch (err) {
+    if (browser) await browser.close();
     res.status(500).json({ error: err.message });
   }
 }
