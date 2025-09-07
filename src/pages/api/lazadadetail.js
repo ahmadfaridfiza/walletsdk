@@ -1,25 +1,57 @@
 import { chromium as playwrightChromium } from 'playwright-core';
 import chromium from '@sparticuz/chromium';
 
-(async () => {
-  const browser = await playwrightChromium.launch({
-    headless: false,  // tampilkan browser
-    slowMo: 100,
-    args: chromium.args,
-    executablePath: await chromium.executablePath()
-  });
+export default async function handler(req, res) {
+  // CORS
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  const page = await browser.newPage();
-  await page.goto("https://s.lazada.co.id/s.ZXV40B", { waitUntil: "networkidle", timeout: 30000 });
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  console.log("URL saat ini:", page.url());  // URL final setelah redirect
+  const { shortlink } = req.body;
+  if (!shortlink) return res.status(400).json({ error: "Shortlink kosong" });
 
-  // tunggu beberapa detik supaya halaman produk render
-  await page.waitForTimeout(10000);
+  let browser = null;
+  try {
+    browser = await playwrightChromium.launch({
+      headless: true,
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+    });
 
-  // ambil screenshot untuk cek
-  await page.screenshot({ path: "debug_shortlink.png", fullPage: true });
+    const page = await browser.newPage();
+    await page.goto(shortlink, { waitUntil: 'networkidle', timeout: 30000 });
 
-  // tetap biarkan browser terbuka supaya bisa lihat manual
-  // await browser.close();
-})();
+    // Tunggu beberapa detik supaya halaman produk render
+    await page.waitForTimeout(5000);
+
+    const realUrl = page.url();
+
+    // Ambil productId dari URL
+    const match = realUrl.match(/-i(\d+)-s\d+/);
+    const productId = match ? match[1] : null;
+
+    // Ambil nama produk (pakai title, aman meski class dinamis)
+    const productName = await page.$eval('title', el => el.textContent?.trim() || null);
+
+    // Ambil harga secara dinamis (scan semua span/div yg mengandung "Rp")
+    const price = await page.evaluate(() => {
+      const elems = Array.from(document.querySelectorAll('span, div'));
+      for (let el of elems) {
+        if (/Rp\s*\d/.test(el.textContent)) {
+          return el.textContent.replace(/\D/g,''); // hanya angka
+        }
+      }
+      return null;
+    });
+
+    await browser.close();
+    res.json({ realUrl, productId, productName, price });
+
+  } catch (err) {
+    if (browser) await browser.close();
+    res.status(500).json({ error: err.message });
+  }
+}
