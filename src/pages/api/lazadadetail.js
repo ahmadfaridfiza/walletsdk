@@ -1,39 +1,25 @@
 import { chromium as playwrightChromium } from 'playwright-core';
 import chromium from '@sparticuz/chromium';
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+(async () => {
+  const browser = await playwrightChromium.launch({
+    headless: false,  // tampilkan browser
+    slowMo: 100,
+    args: chromium.args,
+    executablePath: await chromium.executablePath()
+  });
 
-  const { url } = req.body;
-  if (!url) return res.status(400).json({ error: "URL kosong" });
+  const page = await browser.newPage();
+  await page.goto("https://s.lazada.co.id/s.ZXV40B", { waitUntil: "networkidle", timeout: 30000 });
 
-  let browser = null;
-  try {
-    browser = await playwrightChromium.launch({
-      headless: false,         // <-- tampilkan browser
-      slowMo: 100,             // <-- gerakan lebih lambat untuk debugging
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
-    });
+  console.log("URL saat ini:", page.url());  // URL final setelah redirect
 
-    const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+  // tunggu beberapa detik supaya halaman produk render
+  await page.waitForTimeout(10000);
 
-    // tunggu beberapa detik supaya halaman benar-benar load
-    await page.waitForTimeout(10000);
+  // ambil screenshot untuk cek
+  await page.screenshot({ path: "debug_shortlink.png", fullPage: true });
 
-    // optional: screenshot untuk cek
-    await page.screenshot({ path: 'debug.png', fullPage: true });
-
-    // tetap kembalikan URL final saja
-    const realUrl = page.url();
-    res.json({ realUrl });
-
-    // jangan langsung close browser, biar kamu bisa lihat halaman
-    // await browser.close();  <-- comment dulu
-
-  } catch (err) {
-    if (browser) await browser.close();
-    res.status(500).json({ error: err.message });
-  }
-}
+  // tetap biarkan browser terbuka supaya bisa lihat manual
+  // await browser.close();
+})();
