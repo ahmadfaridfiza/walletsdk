@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
 
     const realUrl = page.url();
-    const productName = await page.$eval('[class*="pdp-mod-product-badge-title"]', el => el.textContent?.trim() || null);
+    const productName = await page.$eval('[class*="pdp-mod-product-badge-title"]', el => el.textContent?.replace(/\D/g,'') || null);
     const price = await page.$eval('[class*="notranslate pdp-price pdp-price_type_normal pdp-price_color_orange pdp-price_size_xl"]', el => el.textContent?.replace(/\D/g,'') || null);
     const match = realUrl.match(/-i(\d+)-s\d+/);
     const productId = match ? match[1] : null;
