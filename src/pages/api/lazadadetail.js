@@ -9,18 +9,29 @@ export default async function handler(req, res) {
 
   let browser = null;
   try {
-    browser = await playwrightChromium.launch({ headless: true, args: chromium.args, executablePath: await chromium.executablePath() });
+    browser = await playwrightChromium.launch({
+      headless: false,         // <-- tampilkan browser
+      slowMo: 100,             // <-- gerakan lebih lambat untuk debugging
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+    });
+
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
 
-    const realUrl = page.url();
-    const productName = await page.$eval('h1', el => el.textContent?.trim() || null);
-    const price = await page.$eval('[class*="pdp-price"]', el => el.textContent?.replace(/\D/g,'') || null);
-    const match = realUrl.match(/-i(\d+)-s\d+/);
-    const productId = match ? match[1] : null;
+    // tunggu beberapa detik supaya halaman benar-benar load
+    await page.waitForTimeout(10000);
 
-    await browser.close();
-    res.json({ realUrl, productId, productName, price });
+    // optional: screenshot untuk cek
+    await page.screenshot({ path: 'debug.png', fullPage: true });
+
+    // tetap kembalikan URL final saja
+    const realUrl = page.url();
+    res.json({ realUrl });
+
+    // jangan langsung close browser, biar kamu bisa lihat halaman
+    // await browser.close();  <-- comment dulu
+
   } catch (err) {
     if (browser) await browser.close();
     res.status(500).json({ error: err.message });
