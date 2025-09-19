@@ -1,104 +1,60 @@
-export default function HotelDashboard() {
-  return (
-    <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div className="w-64 bg-white shadow-md p-4">
-        <h2 className="text-xl font-semibold text-center mb-4">Hotel Menu</h2>
-        <ul className="space-y-2 text-sm">
-          {[
-            "Dashboard",
-            "Room Type Master",
-            "Room Management",
-            "Reservation",
-            "Staff Management",
-            "Restaurant",
-            "Customers",
-            "Reports",
-            "Complaint",
-            "Invoice",
-            "Laundry",
-            "Expenses",
-            "Payments",
-            "Hotel Profile",
-            "Content Management",
-            "Service Providers",
-            "Contact Query",
-          ].map((item, idx) => (
-            <li
-              key={idx}
-              className="px-3 py-2 rounded-md cursor-pointer hover:bg-gray-100 hover:text-blue-600"
-            >
-              {item}
-            </li>
-          ))}
-        </ul>
-      </div>
+import { chromium as playwrightChromium } from 'playwright-core';
+import chromium from '@sparticuz/chromium';
 
-      {/* Main Content */}
-      <div className="flex-1 p-6">
-        {/* Topbar */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-lg font-semibold">
-            Welcome to Hotel Luxury Hotel
-          </h1>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">
-            Logout
-          </button>
-        </div>
+export default async function handler(req, res) {
+  // CORS
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-500 text-white p-6 rounded-xl text-center">
-            <p className="text-2xl font-bold">7</p>
-            <p>Total Rooms</p>
-          </div>
-          <div className="bg-blue-500 text-white p-6 rounded-xl text-center">
-            <p className="text-2xl font-bold">18</p>
-            <p>Total Customers</p>
-          </div>
-          <div className="bg-purple-600 text-white p-6 rounded-xl text-center">
-            <p className="text-2xl font-bold">16</p>
-            <p>Total Food Items</p>
-          </div>
-          <div className="bg-purple-600 text-white p-6 rounded-xl text-center">
-            <p className="text-2xl font-bold">1</p>
-            <p>Total Reservations</p>
-          </div>
-        </div>
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-        {/* Rooms */}
-        <h2 className="text-lg font-semibold mb-4">Rooms (7)</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div className="bg-red-200 p-6 rounded-xl text-center">
-            <p className="font-semibold">Luxury</p>
-            <p className="text-xl font-bold">101</p>
-          </div>
-          <div className="bg-white border p-6 rounded-xl text-center">
-            <p className="font-semibold">Luxury (AC)</p>
-            <p className="text-xl font-bold">201</p>
-          </div>
-          <div className="bg-white border p-6 rounded-xl text-center">
-            <p className="font-semibold">Luxury (AC)</p>
-            <p className="text-xl font-bold">701</p>
-          </div>
-          <div className="bg-white border p-6 rounded-xl text-center">
-            <p className="font-semibold">Luxury (AC)</p>
-            <p className="text-xl font-bold">301</p>
-          </div>
-          <div className="bg-white border p-6 rounded-xl text-center">
-            <p className="font-semibold">Non-Luxury (Non-AC)</p>
-            <p className="text-xl font-bold">401</p>
-          </div>
-          <div className="bg-white border p-6 rounded-xl text-center">
-            <p className="font-semibold">Luxury (AC)</p>
-            <p className="text-xl font-bold">545</p>
-          </div>
-          <div className="bg-white border p-6 rounded-xl text-center">
-            <p className="font-semibold">Default</p>
-            <p className="text-xl font-bold">10199</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const { shortlink } = req.body;
+  if (!shortlink) return res.status(400).json({ error: "Shortlink kosong" });
+
+  let browser = null;
+  try {
+    // Launch serverless-ready Chromium
+    browser = await playwrightChromium.launch({
+      headless: true,
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+    });
+
+    const page = await browser.newPage();
+    await page.goto(shortlink, { waitUntil: 'networkidle', timeout: 60000 });
+
+    // Ambil data produk
+    const nama = await page.title();
+
+    const hargaDiskon = await page.$eval(
+      '.pdp-v2-product-price-content-salePrice-amount',
+      el => el.innerText
+    ).catch(() => null);
+
+    const hargaAsli = await page.$eval(
+      '.pdp-v2-product-price-content-originalPrice-amount',
+      el => el.innerText
+    ).catch(() => hargaDiskon);
+
+    const gambar = await page.$eval(
+      'meta[property="og:image"]',
+      el => el.getAttribute("content")
+    ).catch(() => null);
+
+    await browser.close();
+
+    res.json({
+      realUrl: page.url(),
+      nama,
+      hargaDiskon: hargaDiskon || "Tidak ditemukan",
+      hargaAsli: hargaAsli || "Tidak ditemukan",
+      gambar: gambar || "Tidak ditemukan",
+    });
+
+  } catch (err) {
+    if (browser) await browser.close();
+    res.status(500).json({ error: err.message });
+  }
 }
