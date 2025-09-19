@@ -1,10 +1,8 @@
-import { chromium as playwrightChromium } from "playwright-extra";
-import stealth from "playwright-extra-plugin-stealth";
+import { chromium as playwrightChromium } from "playwright-core";
 import chromium from "@sparticuz/chromium";
 
-playwrightChromium.use(stealth());
-
 export default async function handler(req, res) {
+  // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -30,27 +28,42 @@ export default async function handler(req, res) {
     });
 
     const page = await context.newPage();
+
     await page.goto(shortlink, { waitUntil: "domcontentloaded", timeout: 60000 });
 
-    // Coba cari JSON-LD dulu (lebih aman dari scraping elemen)
-    const content = await page.content();
-    let nama = "Tidak ditemukan",
-      hargaDiskon = "Tidak ditemukan",
-      hargaAsli = "Tidak ditemukan",
-      gambar = "Tidak ditemukan";
+    // Tunggu elemen judul produk
+    await page.waitForSelector("h1.pdp-mod-product-badge-title", { timeout: 15000 });
 
-    const match = content.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
-    if (match) {
-      try {
-        const jsonData = JSON.parse(match[1]);
-        nama = jsonData.name || nama;
-        hargaDiskon = jsonData.offers?.price || hargaDiskon;
-        gambar = Array.isArray(jsonData.image) ? jsonData.image[0] : jsonData.image || gambar;
-      } catch (e) {}
-    }
+    // Ambil data produk
+    const nama = await page.$eval(
+      "h1.pdp-mod-product-badge-title",
+      (el) => el.textContent.trim()
+    );
+
+    const hargaDiskon = await page
+      .$eval(".pdp-price.pdp-price_type_normal", (el) => el.textContent.trim())
+      .catch(() => null);
+
+    const hargaAsli = await page
+      .$eval(".pdp-price.pdp-price_type_deleted", (el) => el.textContent.trim())
+      .catch(() => null);
+
+    const gambar = await page
+      .$eval(
+        ".pdp-mod-common-image.gallery-preview-panel__image",
+        (el) => el.src
+      )
+      .catch(() => null);
 
     await browser.close();
-    res.json({ realUrl: page.url(), nama, hargaDiskon, hargaAsli, gambar });
+
+    res.json({
+      realUrl: page.url(),
+      nama,
+      hargaDiskon: hargaDiskon || "Tidak ditemukan",
+      hargaAsli: hargaAsli || "Tidak ditemukan",
+      gambar: gambar || "Tidak ditemukan",
+    });
   } catch (err) {
     if (browser) await browser.close();
     res.status(500).json({ error: err.message });
