@@ -1,5 +1,5 @@
-import { chromium as playwrightChromium } from 'playwright-core';
-import chromium from '@sparticuz/chromium';
+import { chromium as playwrightChromium } from "playwright-core";
+import chromium from "@sparticuz/chromium";
 
 export default async function handler(req, res) {
   // CORS
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
   let browser = null;
   try {
-    // Launch serverless-ready Chromium
+    // Launch serverless Chromium
     browser = await playwrightChromium.launch({
       headless: true,
       args: chromium.args,
@@ -23,24 +23,38 @@ export default async function handler(req, res) {
     });
 
     const page = await browser.newPage();
-    await page.goto(shortlink, { waitUntil: 'networkidle', timeout: 60000 });
+
+    // User-Agent + viewport supaya tidak kena captcha
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    );
+    await page.setViewportSize({ width: 1366, height: 768 });
+
+    // Buka halaman produk
+    await page.goto(shortlink, { waitUntil: "domcontentloaded", timeout: 60000 });
+
+    // Tunggu elemen judul produk
+    await page.waitForSelector("h1.pdp-mod-product-badge-title", { timeout: 15000 });
 
     // Ambil data produk
-    const nama = await page.title();
+    const nama = await page.$eval(
+      "h1.pdp-mod-product-badge-title",
+      (el) => el.textContent.trim()
+    );
 
     const hargaDiskon = await page.$eval(
-      '.pdp-v2-product-price-content-salePrice-amount',
-      el => el.innerText
+      ".pdp-price.pdp-price_type_normal",
+      (el) => el.textContent.trim()
     ).catch(() => null);
 
     const hargaAsli = await page.$eval(
-      '.pdp-v2-product-price-content-originalPrice-amount',
-      el => el.innerText
-    ).catch(() => hargaDiskon);
+      ".pdp-price.pdp-price_type_deleted",
+      (el) => el.textContent.trim()
+    ).catch(() => null);
 
     const gambar = await page.$eval(
-      'meta[property="og:image"]',
-      el => el.getAttribute("content")
+      ".pdp-mod-common-image.gallery-preview-panel__image",
+      (el) => el.src
     ).catch(() => null);
 
     await browser.close();
@@ -52,7 +66,6 @@ export default async function handler(req, res) {
       hargaAsli: hargaAsli || "Tidak ditemukan",
       gambar: gambar || "Tidak ditemukan",
     });
-
   } catch (err) {
     if (browser) await browser.close();
     res.status(500).json({ error: err.message });
