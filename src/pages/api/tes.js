@@ -15,22 +15,20 @@ export default async function handler(req, res) {
 
   let browser = null;
   try {
-    // Launch serverless Chromium
     browser = await playwrightChromium.launch({
       headless: true,
       args: chromium.args,
       executablePath: await chromium.executablePath(),
     });
 
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      viewport: { width: 1366, height: 768 },
+    });
 
-    // User-Agent + viewport supaya tidak kena captcha
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    );
-    await page.setViewportSize({ width: 1366, height: 768 });
+    const page = await context.newPage();
 
-    // Buka halaman produk
     await page.goto(shortlink, { waitUntil: "domcontentloaded", timeout: 60000 });
 
     // Tunggu elemen judul produk
@@ -42,20 +40,20 @@ export default async function handler(req, res) {
       (el) => el.textContent.trim()
     );
 
-    const hargaDiskon = await page.$eval(
-      ".pdp-price.pdp-price_type_normal",
-      (el) => el.textContent.trim()
-    ).catch(() => null);
+    const hargaDiskon = await page
+      .$eval(".pdp-price.pdp-price_type_normal", (el) => el.textContent.trim())
+      .catch(() => null);
 
-    const hargaAsli = await page.$eval(
-      ".pdp-price.pdp-price_type_deleted",
-      (el) => el.textContent.trim()
-    ).catch(() => null);
+    const hargaAsli = await page
+      .$eval(".pdp-price.pdp-price_type_deleted", (el) => el.textContent.trim())
+      .catch(() => null);
 
-    const gambar = await page.$eval(
-      ".pdp-mod-common-image.gallery-preview-panel__image",
-      (el) => el.src
-    ).catch(() => null);
+    const gambar = await page
+      .$eval(
+        ".pdp-mod-common-image.gallery-preview-panel__image",
+        (el) => el.src
+      )
+      .catch(() => null);
 
     await browser.close();
 
