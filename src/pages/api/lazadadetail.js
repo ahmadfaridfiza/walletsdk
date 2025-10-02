@@ -15,6 +15,7 @@ export default async function handler(req, res) {
 
   let browser = null;
   try {
+    // Launch serverless-ready Chromium
     browser = await playwrightChromium.launch({
       headless: true,
       args: chromium.args,
@@ -24,31 +25,11 @@ export default async function handler(req, res) {
     const page = await browser.newPage();
     await page.goto(shortlink, { waitUntil: 'networkidle', timeout: 30000 });
 
-    // Tunggu beberapa detik supaya halaman produk render
-    await page.waitForTimeout(5000);
-
-    const realUrl = page.url();
-
-    // Ambil productId dari URL
-    const match = realUrl.match(/-i(\d+)-s\d+/);
-    const productId = match ? match[1] : null;
-
-    // Ambil nama produk (pakai title, aman meski class dinamis)
-    const productName = await page.$eval('title', el => el.textContent?.trim() || null);
-
-    // Ambil harga secara dinamis (scan semua span/div yg mengandung "Rp")
-    const price = await page.evaluate(() => {
-      const elems = Array.from(document.querySelectorAll('span, div'));
-      for (let el of elems) {
-        if (/Rp\s*\d/.test(el.textContent)) {
-          return el.textContent.replace(/\D/g,''); // hanya angka
-        }
-      }
-      return null;
-    });
-
+    const realUrl = page.url(); // URL setelah JS redirect
+    const title = await page.title();
     await browser.close();
-    res.json({ realUrl, productId, productName, price });
+
+    res.json({ realUrl, title });
 
   } catch (err) {
     if (browser) await browser.close();
