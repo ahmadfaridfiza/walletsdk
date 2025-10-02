@@ -16,6 +16,7 @@ export default async function handler(req, res){
   if (!shortlink) return res.status(400).json({ error: "Shortlink kosong" });
 
   let browser = null;
+  let context = null;
   try {
     // Launch serverless-ready Chromium
     browser = await playwrightChromium.launch({
@@ -24,15 +25,18 @@ export default async function handler(req, res){
       executablePath: await chromium.executablePath(),
     });
 
-    const page = await browser.newPage();
-
-    // make request look more "human"
-    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36");
-    await page.setViewport({ width: 1280, height: 800 });
-    await page.setExtraHTTPHeaders({
-      "accept-language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-      "referer": "https://www.lazada.co.id/"
+    // Create context WITH userAgent, viewport, headers (Playwright style)
+    context = await browser.newContext({
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36",
+      viewport: { width: 1280, height: 800 },
+      locale: "id-ID",
+      extraHTTPHeaders: {
+        "accept-language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+        "referer": "https://www.lazada.co.id/"
+      }
     });
+
+    const page = await context.newPage();
 
     // 1) buka shortlink, tunggu redirect
     await page.goto(shortlink, { waitUntil: 'networkidle', timeout: 30000 });
@@ -41,11 +45,9 @@ export default async function handler(req, res){
 
     // 2) try to extract actual target if page is a punish/redirect wrapper
     let finalUrl = realUrl;
-
     if (/punish|x5secdata/i.test(realUrl)) {
       try {
         const u = new URL(realUrl);
-        // try common param names that may contain encoded original url
         const candidates = ['x5secdata', 'url', 'u', 'redirect', 'target'];
         let found = null;
         for (const k of candidates) {
@@ -53,29 +55,22 @@ export default async function handler(req, res){
           if (v) { found = v; break; }
         }
         if (found) {
-          // sometimes double-encoded; try decodeURIComponent repeatedly
           let decoded = found;
           for (let i=0;i<3;i++){
             try { decoded = decodeURIComponent(decoded); } catch(e){ break; }
           }
-          // search for lazada path inside decoded string
           const idx = decoded.indexOf('lazada.co.id');
           if (idx !== -1) {
-            // try to build full URL from the substring
             const substring = decoded.slice(idx);
-            if (substring.startsWith('lazada.co.id')) {
-              finalUrl = 'https://' + substring;
-            } else if (substring.startsWith('http')) {
-              finalUrl = substring;
-            } else {
-              finalUrl = substring.includes('http') ? substring : ('https://' + substring);
-            }
+            if (substring.startsWith('lazada.co.id')) finalUrl = 'https://' + substring;
+            else if (substring.startsWith('http')) finalUrl = substring;
+            else finalUrl = ('https://' + substring);
           } else if (decoded.startsWith('http')) {
             finalUrl = decoded;
           }
         }
       } catch (e) {
-        // parsing failed -> keep realUrl as finalUrl
+        // ignore parsing error
       }
     }
 
@@ -96,6 +91,7 @@ export default async function handler(req, res){
     // Detect captcha / interception
     const captchaDetected = /captcha|interception|x5sec|bot detection|access denied/i.test(bodyText) || /punish|x5secdata/i.test(nowUrl);
     if (captchaDetected) {
+      await context.close();
       await browser.close();
       return res.json({
         ok: false,
@@ -116,14 +112,13 @@ export default async function handler(req, res){
       "span[class*='salePrice-amount']",
       ".pdp-price",
       ".pdp-price_type_normal",
-      "meta[property='product:price:amount']" // meta fallback
+      "meta[property='product:price:amount']"
     ];
 
     for (const sel of priceSelectors) {
       try {
         if (sel.startsWith("meta")) {
-          const metaSel = sel;
-          const val = await page.$eval(metaSel, el => el.getAttribute('content')).catch(()=>null);
+          const val = await page.$eval(sel, el => el.getAttribute('content')).catch(()=>null);
           if (val) { price = val; break; }
         } else {
           const val = await page.$eval(sel, el => el.innerText.trim()).catch(()=>null);
@@ -132,6 +127,7 @@ export default async function handler(req, res){
       } catch(e){ /* ignore and try next */ }
     }
 
+    await context.close();
     await browser.close();
 
     return res.json({
@@ -144,7 +140,8 @@ export default async function handler(req, res){
     });
 
   } catch (err) {
-    if (browser) await browser.close();
+    try { if (context) await context.close(); } catch(e){}
+    try { if (browser) await browser.close(); } catch(e){}
     return res.status(500).json({ ok:false, error: err.message });
   }
 }
