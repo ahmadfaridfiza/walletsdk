@@ -1,5 +1,5 @@
-// pages/api/scrape.js
-import puppeteer from 'puppeteer';
+import chromium from 'chrome-aws-lambda';
+import puppeteer from 'puppeteer-core';
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -12,11 +12,15 @@ export default async function handler(req, res) {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: "URL is required" });
 
-  let browser;
+  let browser = null;
   try {
-    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless,
+    });
+
     const page = await browser.newPage();
-    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131 Safari/537.36");
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
 
     const title = await page.title();
@@ -27,6 +31,7 @@ export default async function handler(req, res) {
 
     await browser.close();
     res.status(200).json({ title, price });
+
   } catch (err) {
     if (browser) await browser.close();
     res.status(500).json({ error: err.message });
