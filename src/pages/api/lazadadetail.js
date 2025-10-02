@@ -1,112 +1,38 @@
-import { chromium as playwrightChromium } from 'playwright-core';
-import chromium from '@sparticuz/chromium';
+import axios from "axios";
+import cheerio from "cheerio";
 
-function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
-
-export default async function handler(req, res){
+export default async function handler(req, res) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { shortlink } = req.body;
-  if (!shortlink) return res.status(400).json({ error: "Shortlink kosong" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed. Use POST." });
+  }
 
-  let browser = null;
-  let context = null;
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: "Missing url in request body." });
+
   try {
-    // Launch serverless-ready Chromium
-    browser = await playwrightChromium.launch({
-      headless: true,
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
+    // Ambil HTML
+    const { data: html } = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36",
+        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.lazada.co.id/"
+      },
+      timeout: 15000
     });
 
-    // Create context WITH userAgent, viewport, headers (Playwright style)
-    context = await browser.newContext({
-      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36",
-      viewport: { width: 1280, height: 800 },
-      locale: "id-ID",
-      extraHTTPHeaders: {
-        "accept-language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-        "referer": "https://www.lazada.co.id/"
-      }
-    });
+    const $ = cheerio.load(html);
 
-    const page = await context.newPage();
+    // Ambil title
+    const title = $("title").text().trim() || null;
 
-    // 1) buka shortlink, tunggu redirect
-    await page.goto(shortlink, { waitUntil: 'networkidle', timeout: 30000 });
-    await sleep(600);
-    const realUrl = page.url();
-
-    // 2) try to extract actual target if page is a punish/redirect wrapper
-    let finalUrl = realUrl;
-    if (/punish|x5secdata/i.test(realUrl)) {
-      try {
-        const u = new URL(realUrl);
-        const candidates = ['x5secdata', 'url', 'u', 'redirect', 'target'];
-        let found = null;
-        for (const k of candidates) {
-          const v = u.searchParams.get(k);
-          if (v) { found = v; break; }
-        }
-        if (found) {
-          let decoded = found;
-          for (let i=0;i<3;i++){
-            try { decoded = decodeURIComponent(decoded); } catch(e){ break; }
-          }
-          const idx = decoded.indexOf('lazada.co.id');
-          if (idx !== -1) {
-            const substring = decoded.slice(idx);
-            if (substring.startsWith('lazada.co.id')) finalUrl = 'https://' + substring;
-            else if (substring.startsWith('http')) finalUrl = substring;
-            else finalUrl = ('https://' + substring);
-          } else if (decoded.startsWith('http')) {
-            finalUrl = decoded;
-          }
-        }
-      } catch (e) {
-        // ignore parsing error
-      }
-    }
-
-    // If finalUrl is different from current page, navigate to it
-    if (finalUrl && finalUrl !== realUrl) {
-      await page.goto(finalUrl, { waitUntil: 'networkidle', timeout: 30000 });
-      await sleep(600);
-    } else {
-      // ensure dynamic content loads
-      await sleep(800);
-      await page.evaluate(()=> window.scrollBy(0, 600));
-      await sleep(600);
-    }
-
-    const nowUrl = page.url();
-    const bodyText = await page.evaluate(()=> document.body.innerText || '');
-
-    // Detect captcha / interception
-    const captchaDetected = /captcha|interception|x5sec|bot detection|access denied/i.test(bodyText) || /punish|x5secdata/i.test(nowUrl);
-    if (captchaDetected) {
-      await context.close();
-      await browser.close();
-      return res.json({
-        ok: false,
-        reason: "captcha",
-        detail: "Detected anti-bot (captcha/interception). Use residential proxy, cookies or captcha solver.",
-        realUrl: realUrl,
-        attemptedUrl: finalUrl,
-        finalResolvedUrl: nowUrl
-      });
-    }
-
-    // Extract title and price with fallback selectors
-    const title = await page.title().catch(()=>null);
-
-    let price = null;
+    // Ambil harga (beberapa fallback selector)
     const priceSelectors = [
       "span.pdp-v2-product-price-content-salePrice-amount",
       "span[class*='salePrice-amount']",
@@ -115,33 +41,35 @@ export default async function handler(req, res){
       "meta[property='product:price:amount']"
     ];
 
+    let price = null;
     for (const sel of priceSelectors) {
-      try {
-        if (sel.startsWith("meta")) {
-          const val = await page.$eval(sel, el => el.getAttribute('content')).catch(()=>null);
-          if (val) { price = val; break; }
-        } else {
-          const val = await page.$eval(sel, el => el.innerText.trim()).catch(()=>null);
-          if (val) { price = val; break; }
-        }
-      } catch(e){ /* ignore and try next */ }
+      if (sel.startsWith("meta")) {
+        price = $(`${sel}`).attr("content");
+      } else {
+        price = $(sel).first().text().trim();
+      }
+      if (price) break;
     }
 
-    await context.close();
-    await browser.close();
+    // Deteksi captcha sederhana
+    const captchaDetected = /captcha|interception|bot detection|access denied/i.test(html);
+    if (captchaDetected) {
+      return res.json({
+        ok: false,
+        reason: "captcha",
+        detail: "Detected anti-bot. HTML contains captcha",
+        url
+      });
+    }
 
     return res.json({
       ok: true,
-      realUrl,
-      finalUrl,
-      resolvedUrl: nowUrl,
+      url,
       title,
       price
     });
 
   } catch (err) {
-    try { if (context) await context.close(); } catch(e){}
-    try { if (browser) await browser.close(); } catch(e){}
-    return res.status(500).json({ ok:false, error: err.message });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 }
