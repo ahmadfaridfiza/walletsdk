@@ -27,9 +27,13 @@ export default async function handler(req, res) {
 
     const realUrl = page.url(); // URL setelah JS redirect
     const title = await page.title();
+    const price = await page.$eval(
+      "span.pdp-v2-product-price-content-salePrice-amount",
+      el => el.innerText
+    ).catch(() => null);
     await browser.close();
 
-    res.json({ realUrl, title });
+    res.json({ realUrl, title, price });
 
   } catch (err) {
     if (browser) await browser.close();
