@@ -1,48 +1,30 @@
-import chromium from "@sparticuz/chromium";
-import puppeteer from "puppeteer-core";
+import { get_shopee_product_detail } from '../shopee.js'; // sesuaikan path kamu
 
 export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: "URL produk kosong" });
+
   try {
-    const { url } = req.query;
-    if (!url) return res.status(400).json({ success: false, message: "URL tidak diberikan" });
+    const data = await get_shopee_product_detail(url);
+    if (data.error) throw new Error(data.message);
 
-    // Launch Chromium yang kompatibel dengan Vercel
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+    res.json({
+      success: true,
+      name: data.name,
+      price: data.models[0]?.price / 100000 ?? data.price / 100000,
+      rating: data.item_rating.rating_star,
+      stock: data.stock,
+      images: data.images,
+      url: data.url,
     });
-
-    const page = await browser.newPage();
-    await page.goto(url, { waitUntil: "domcontentloaded" });
-
-    // Ambil harga
-    const harga_selectors = [
-      "span.pdp-v2-product-price-content-salePrice-amount",
-      "span[class*='salePrice-amount']",
-      "div[data-testid='product-price']", // tambahan umum
-    ];
-
-    let price = null;
-    for (const selector of harga_selectors) {
-      price = await page.$eval(selector, el => el.textContent.trim()).catch(() => null);
-      if (price) break;
-    }
-
-    await browser.close();
-
-    if (!price) {
-      return res.status(404).json({ success: false, message: "Harga tidak ditemukan" });
-    }
-
-    res.json({ success: true, price });
   } catch (err) {
-    console.error("Scraping error:", err);
-    res.status(500).json({
-      success: false,
-      message: "Gagal scraping harga.",
-      error: err.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 }
