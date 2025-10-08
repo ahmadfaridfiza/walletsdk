@@ -1,4 +1,4 @@
-import { get_shopee_product_detail } from '../shopee.js'; // sesuaikan path kamu
+import { get_shopee_product_detail } from '../../lib/shopee.js'; // sesuaikan path kamu
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
