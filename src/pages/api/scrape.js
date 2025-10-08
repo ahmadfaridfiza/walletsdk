@@ -1,4 +1,4 @@
-import { get_shopee_product_detail } from '../../lib/shopee.js'; // sesuaikan path kamu
+import { get_shopee_product_detail } from "../../lib/sp.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -13,16 +13,19 @@ export default async function handler(req, res) {
 
   try {
     const data = await get_shopee_product_detail(url);
-    if (data.error) throw new Error(data.message);
+
+    if (data.error || !data.name) {
+      throw new Error(data.message || "Gagal mengambil data produk.");
+    }
 
     res.json({
       success: true,
       name: data.name,
-      price: data.models[0]?.price / 100000 ?? data.price / 100000,
+      price: data.price_min / 100000,
       rating: data.item_rating.rating_star,
       stock: data.stock,
-      images: data.images,
-      url: data.url,
+      images: data.images.map(img => `https://cf.shopee.co.id/file/${img}`),
+      url,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
