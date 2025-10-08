@@ -5,28 +5,62 @@ export default async function handler(req, res) {
   const { url } = req.query;
 
   if (!url) {
-    return res.status(400).json({ success: false, message: "URL is required" });
+    return res.status(400).json({ success: false, error: "URL diperlukan" });
   }
 
+  const hargaSelectors = [
+    "span.pdp-v2-product-price-content-salePrice-amount",
+    "span[class*='salePrice-amount']",
+    "div[class*='product-price'] span",
+    ".product-price-value",
+    ".pdp-price",
+  ];
+
   try {
+    const executablePath = await chromium.executablePath;
+
     const browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath,
+      executablePath,
       headless: chromium.headless,
-      ignoreHTTPSErrors: true,
     });
 
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: "networkidle2" });
 
-    // contoh ambil judul halaman
-    const title = await page.title();
+    await page.goto(url, {
+      waitUntil: "networkidle2",
+      timeout: 60000,
+    });
+
+    // Tunggu elemen harga muncul
+    let harga = null;
+    for (const selector of hargaSelectors) {
+      try {
+        await page.waitForSelector(selector, { timeout: 5000 });
+        harga = await page.$eval(selector, (el) => el.textContent.trim());
+        if (harga) break;
+      } catch {
+        // lanjut ke selector berikutnya
+      }
+    }
 
     await browser.close();
 
-    res.status(200).json({ success: true, title });
+    if (!harga) {
+      return res.status(404).json({
+        success: false,
+        message: "Harga tidak ditemukan. Selector mungkin perlu diperbarui.",
+      });
+    }
+
+    return res.status(200).json({ success: true, harga });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Scrape Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal scraping harga.",
+      error: error.message,
+    });
   }
 }
