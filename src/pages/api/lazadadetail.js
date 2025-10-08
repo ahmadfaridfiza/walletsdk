@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     }
     await browser.close();
 
-    res.json({ realUrl });
+    res.json({ realUrl, price });
 
   } catch (err) {
     if (browser) await browser.close();
