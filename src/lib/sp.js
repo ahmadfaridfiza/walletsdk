@@ -1,19 +1,15 @@
 import axios from "axios";
 
-/**
- * Ambil detail produk Shopee dari URL.
- * @param {string} url - URL produk Shopee
- */
 export async function get_shopee_product_detail(url) {
   try {
-    // Ekstrak shopid & itemid dari URL Shopee
+    // Ambil shopid dan itemid dari semua variasi URL Shopee
     const match = url.match(/i\.(\d+)\.(\d+)/);
     if (!match) {
-      throw new Error("URL produk Shopee tidak valid.");
+      throw new Error("URL Shopee tidak valid atau tidak mengandung shopid/itemid.");
     }
     const [, shopid, itemid] = match;
 
-    // Request API Shopee resmi (v4)
+    // Panggil API Shopee resmi
     const response = await axios.get(
       `https://shopee.co.id/api/v4/item/get?itemid=${itemid}&shopid=${shopid}`,
       {
@@ -28,9 +24,20 @@ export async function get_shopee_product_detail(url) {
       }
     );
 
-    return response.data.data;
+    const data = response.data?.data;
+    if (!data) throw new Error("Data produk tidak ditemukan.");
+
+    return {
+      success: true,
+      name: data.name,
+      price: data.price_min / 100000,
+      rating: data.item_rating?.rating_star,
+      stock: data.stock,
+      images: data.images?.map((img) => `https://cf.shopee.co.id/file/${img}`),
+      url,
+    };
   } catch (err) {
-    console.error("Shopee API Error:", err.message);
-    return { error: true, message: err.message };
+    console.error("Shopee Fetch Error:", err.message);
+    return { success: false, message: err.message };
   }
 }
