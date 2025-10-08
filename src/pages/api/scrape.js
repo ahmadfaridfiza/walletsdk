@@ -1,66 +1,48 @@
-import chromium from "chrome-aws-lambda";
+import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
 
 export default async function handler(req, res) {
-  const { url } = req.query;
-
-  if (!url) {
-    return res.status(400).json({ success: false, error: "URL diperlukan" });
-  }
-
-  const hargaSelectors = [
-    "span.pdp-v2-product-price-content-salePrice-amount",
-    "span[class*='salePrice-amount']",
-    "div[class*='product-price'] span",
-    ".product-price-value",
-    ".pdp-price",
-  ];
-
   try {
-    const executablePath = await chromium.executablePath;
+    const { url } = req.query;
+    if (!url) return res.status(400).json({ success: false, message: "URL tidak diberikan" });
 
+    // Launch Chromium yang kompatibel dengan Vercel
     const browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath,
+      executablePath: await chromium.executablePath(),
       headless: chromium.headless,
     });
 
     const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "domcontentloaded" });
 
-    await page.goto(url, {
-      waitUntil: "networkidle2",
-      timeout: 60000,
-    });
+    // Ambil harga
+    const harga_selectors = [
+      "span.pdp-v2-product-price-content-salePrice-amount",
+      "span[class*='salePrice-amount']",
+      "div[data-testid='product-price']", // tambahan umum
+    ];
 
-    // Tunggu elemen harga muncul
-    let harga = null;
-    for (const selector of hargaSelectors) {
-      try {
-        await page.waitForSelector(selector, { timeout: 5000 });
-        harga = await page.$eval(selector, (el) => el.textContent.trim());
-        if (harga) break;
-      } catch {
-        // lanjut ke selector berikutnya
-      }
+    let price = null;
+    for (const selector of harga_selectors) {
+      price = await page.$eval(selector, el => el.textContent.trim()).catch(() => null);
+      if (price) break;
     }
 
     await browser.close();
 
-    if (!harga) {
-      return res.status(404).json({
-        success: false,
-        message: "Harga tidak ditemukan. Selector mungkin perlu diperbarui.",
-      });
+    if (!price) {
+      return res.status(404).json({ success: false, message: "Harga tidak ditemukan" });
     }
 
-    return res.status(200).json({ success: true, harga });
-  } catch (error) {
-    console.error("Scrape Error:", error);
-    return res.status(500).json({
+    res.json({ success: true, price });
+  } catch (err) {
+    console.error("Scraping error:", err);
+    res.status(500).json({
       success: false,
       message: "Gagal scraping harga.",
-      error: error.message,
+      error: err.message,
     });
   }
 }

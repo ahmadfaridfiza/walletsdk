@@ -1,8 +1,8 @@
 {
   "functions": {
     "src/pages/api/**/*.js": {
-      "maxDuration": 10,
-      "memory": 1024
+      "runtime": "nodejs20.x",
+      "maxDuration": 10
     }
   }
 }
