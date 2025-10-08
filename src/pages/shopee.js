@@ -1,5 +1,5 @@
 import axios from 'axios';
-import * as utils from ',/utils.js';
+import * as utils from '.utils.js';
 
 const DEFAULT_USER_AGENT = 'Best Deals for Affiliate';
 const BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) '
