@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
     const router = new ethers.Contract(
-      "0x87FD5305E6a40F378da124864B2D479c2028BD86",
+      "0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3",
       routerABI,
       wallet
     );
