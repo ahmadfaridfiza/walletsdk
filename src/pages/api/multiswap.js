@@ -67,11 +67,26 @@ export default async function handler(req, res) {
     // =========================
     // TOKEN -> TOKEN
     // =========================
+	
+	// get suggested fee data from RPC
+const fee = await provider.getFeeData();
+
+// fallback values if RPC returns null
+const maxPriorityFeePerGas =
+  fee.maxPriorityFeePerGas || ethers.utils.parseUnits("30", "gwei");
+const maxFeePerGas =
+  fee.maxFeePerGas || ethers.utils.parseUnits("35", "gwei");
+  
     const token = new ethers.Contract(tokenIn, ERC20_ABI, wallet);
     const decimals = await token.decimals();
     const amountIn = ethers.utils.parseUnits(amount, decimals);
 
-    await token.approve(routerContract, amountIn);
+    await token.approve(routerContract, amountIn);// approve with correct gas fees
+await token.approve(routerContract, amountIn, {
+  maxFeePerGas,
+  maxPriorityFeePerGas,
+  gasLimit: 120000
+});
 
     const path = [tokenIn, tokenOut];
     const amounts = await router.getAmountsOut(amountIn, path);
@@ -84,8 +99,10 @@ export default async function handler(req, res) {
       wallet.address,
       deadline,
       {
-        gasLimit: 400000
-      }
+    gasLimit: 400000,
+    maxFeePerGas,
+    maxPriorityFeePerGas
+  }
     );
 
     await tx.wait();
