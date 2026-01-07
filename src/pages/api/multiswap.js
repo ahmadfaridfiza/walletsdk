@@ -29,15 +29,24 @@ export default async function handler(req, res) {
     const provider = new ethers.providers.JsonRpcProvider(rpc);
     const wallet = new ethers.Wallet(privatekey, provider);
     const router = new ethers.Contract(routerContract, ROUTER_ABI, wallet);
+	
+		// get suggested fee data from RPC
+const fee = await provider.getFeeData();
+
+// fallback values if RPC returns null
+const maxPriorityFeePerGas =
+  fee.maxPriorityFeePerGas || ethers.utils.parseUnits("30", "gwei");
+const maxFeePerGas =
+  fee.maxFeePerGas || ethers.utils.parseUnits("35", "gwei");
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
-    const isBNB =
-      tokenIn.toLowerCase() === "0xae13d989dac2f0debff460ac112a837c89baa7cd"; // WBNB testnet
+    const isPOL =
+      tokenIn.toLowerCase() === "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270";
 
     // =========================
-    // BNB -> TOKEN
+    // POL -> TOKEN
     // =========================
-    if (isBNB) {
+    if (isPOL) {
       const amountIn = ethers.utils.parseEther(amount);
       const path = [tokenIn, tokenOut];
 
@@ -51,7 +60,9 @@ export default async function handler(req, res) {
         deadline,
         {
           value: amountIn,
-          gasLimit: 300000
+          gasLimit: 300000,
+		  maxFeePerGas,
+    maxPriorityFeePerGas
         }
       );
 
@@ -59,7 +70,7 @@ export default async function handler(req, res) {
 
       return res.json({
         success: true,
-        type: "BNB_TO_TOKEN",
+        type: "POL_TO_TOKEN",
         txHash: tx.hash
       });
     }
@@ -67,15 +78,6 @@ export default async function handler(req, res) {
     // =========================
     // TOKEN -> TOKEN
     // =========================
-	
-	// get suggested fee data from RPC
-const fee = await provider.getFeeData();
-
-// fallback values if RPC returns null
-const maxPriorityFeePerGas =
-  fee.maxPriorityFeePerGas || ethers.utils.parseUnits("30", "gwei");
-const maxFeePerGas =
-  fee.maxFeePerGas || ethers.utils.parseUnits("35", "gwei");
   
     const token = new ethers.Contract(tokenIn, ERC20_ABI, wallet);
     const decimals = await token.decimals();
