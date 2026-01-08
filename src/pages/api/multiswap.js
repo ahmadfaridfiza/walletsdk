@@ -10,7 +10,7 @@ const ERC20_ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
   "function decimals() view returns (uint8)"
 ];
-
+let gasPrice;
 export default async function handler(req, res) {
   try {
     const {
@@ -98,8 +98,8 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(500).json({
       success: false,
-	  gasPriceWei: gasPrice.toString(),
-  gasPriceGwei: ethers.utils.formatUnits(gasPrice, "gwei"),
+	  gasPriceWei: gasPrice ? gasPrice.toString() : null,
+    gasPriceGwei: gasPrice ? ethers.utils.formatUnits(gasPrice, "gwei") : null,
       error: e.message
     });
   }
