@@ -35,8 +35,8 @@ export default async function handler(req, res) {
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
     const isPOL =
-      tokenIn.toLowerCase() === "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // WMATIC
-	  const isWMATIC = tokenOut.toLowerCase() === "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270";
+      tokenIn.toLowerCase() === "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"; // WMATIC
+	  const isWMATIC = tokenOut.toLowerCase() === "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270";
 
     // =========================
     // POL -> TOKEN
@@ -115,7 +115,7 @@ if (isWMATIC) {
     // =========================
     // TOKEN -> TOKEN
     // =========================
-	if (!isWMATIC){
+	else {
     const token = new ethers.Contract(tokenIn, ERC20_ABI, wallet);
     const decimals = await token.decimals();
     const amountIn = ethers.utils.parseUnits(amount, decimals);
