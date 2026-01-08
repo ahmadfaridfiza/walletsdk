@@ -31,13 +31,7 @@ export default async function handler(req, res) {
     const router = new ethers.Contract(routerContract, ROUTER_ABI, wallet);
 	
 		// get suggested fee data from RPC
-const fee = await provider.getFeeData();
-
-// fallback values if RPC returns null
-const maxPriorityFeePerGas =
-  fee.maxPriorityFeePerGas || ethers.utils.parseUnits("30", "gwei");
-const maxFeePerGas =
-  fee.maxFeePerGas || ethers.utils.parseUnits("35", "gwei");
+const gasPrice = ethers.utils.parseUnits("50", "gwei");
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
     const isPOL =
@@ -61,8 +55,8 @@ const maxFeePerGas =
         {
           value: amountIn,
           gasLimit: 300000,
-		  maxFeePerGas,
-    maxPriorityFeePerGas
+		  gasPrice: gasPrice,
+    type: 0
         }
       );
 
@@ -84,11 +78,7 @@ const maxFeePerGas =
     const amountIn = ethers.utils.parseUnits(amount, decimals);
 
     await token.approve(routerContract, amountIn);// approve with correct gas fees
-await token.approve(routerContract, amountIn, {
-  maxFeePerGas,
-  maxPriorityFeePerGas,
-  gasLimit: 120000
-});
+await token.approve(routerContract, amountIn);
 
     const path = [tokenIn, tokenOut];
     const amounts = await router.getAmountsOut(amountIn, path);
@@ -102,8 +92,8 @@ await token.approve(routerContract, amountIn, {
       deadline,
       {
     gasLimit: 400000,
-    maxFeePerGas,
-    maxPriorityFeePerGas
+    gasPrice: gasPrice,
+    type: 0
   }
     );
 
