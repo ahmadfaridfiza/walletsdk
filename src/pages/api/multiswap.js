@@ -1,5 +1,4 @@
 import { ethers } from "ethers";
-import axios from "axios";
 
 const ROUTER_ABI = [
   "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) payable returns (uint[] memory)",
@@ -20,8 +19,7 @@ export default async function handler(req, res) {
       amount,
       privatekey,
       rpc,
-      routerContract,
-      network = "mainnet"
+      routerContract
     } = req.query;
 
     if (!tokenIn || !tokenOut || !amount || !privatekey || !rpc || !routerContract) {
@@ -32,39 +30,10 @@ export default async function handler(req, res) {
     const wallet = new ethers.Wallet(privatekey, provider);
     const router = new ethers.Contract(routerContract, ROUTER_ABI, wallet);
 
-    // -------- GAS CONFIG ----------
-    const gasStationURL =
-      network === "mainnet"
-        ? "https://gasstation.polygon.technology/v2"
-        : "https://gasstation-testnet.polygon.technology/v2";
-
-    // fallback 40 gwei
-    let maxFeePerGas = ethers.utils.parseUnits("400", "gwei");
-    let maxPriorityFeePerGas = ethers.utils.parseUnits("400", "gwei");
-
-    async function setOptimalGas() {
-      try {
-        const resp = await axios.get(gasStationURL);
-
-        maxFeePerGas = ethers.utils.parseUnits(
-          Math.ceil(resp.data.fast.maxFee).toString(),
-          "gwei"
-        );
-
-        maxPriorityFeePerGas = ethers.utils.parseUnits(
-          Math.ceil(resp.data.fast.maxPriorityFee).toString(),
-          "gwei"
-        );
-      } catch (e) {
-        // ignore fallback
-      }
-    }
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
-
-    // WMATIC native wrapper
-    const WMATIC = "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270".toLowerCase();
-    const isPOL = tokenIn.toLowerCase() === WMATIC;
+    const isPOL =
+      tokenIn.toLowerCase() === "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270";
 
     // =========================
     // POL -> TOKEN
@@ -76,19 +45,12 @@ export default async function handler(req, res) {
       const amounts = await router.getAmountsOut(amountIn, path);
       const amountOutMin = amounts[1].mul(95).div(100); // 5% slippage
 
-      await setOptimalGas();
-
       const tx = await router.swapExactETHForTokens(
         amountOutMin,
         path,
         wallet.address,
         deadline,
-        {
-          value: amountIn,
-          gasLimit: 300000,
-          maxFeePerGas,
-          maxPriorityFeePerGas
-        }
+       
       );
 
       await tx.wait();
@@ -103,20 +65,17 @@ export default async function handler(req, res) {
     // =========================
     // TOKEN -> TOKEN
     // =========================
-
+  
     const token = new ethers.Contract(tokenIn, ERC20_ABI, wallet);
     const decimals = await token.decimals();
     const amountIn = ethers.utils.parseUnits(amount, decimals);
 
-    const approveTx = await token.approve(routerContract, amountIn);
-    await approveTx.wait();
+    await token.approve(routerContract, amountIn);// approve with correct gas fees
+
 
     const path = [tokenIn, tokenOut];
-
     const amounts = await router.getAmountsOut(amountIn, path);
     const amountOutMin = amounts[1].mul(95).div(100);
-
-    await setOptimalGas();
 
     const tx = await router.swapExactTokensForTokens(
       amountIn,
@@ -124,11 +83,7 @@ export default async function handler(req, res) {
       path,
       wallet.address,
       deadline,
-      {
-        gasLimit: 400000,
-        maxFeePerGas,
-        maxPriorityFeePerGas
-      }
+      
     );
 
     await tx.wait();
