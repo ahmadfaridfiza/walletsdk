@@ -29,18 +29,15 @@ export default async function handler(req, res) {
     const provider = new ethers.providers.JsonRpcProvider(rpc);
     const wallet = new ethers.Wallet(privatekey, provider);
     const router = new ethers.Contract(routerContract, ROUTER_ABI, wallet);
-	
-	const gasPrice = await provider.getGasPrice();
-
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
-    const isPOL =
-      tokenIn.toLowerCase() === "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270";
+    const isBNB =
+      tokenIn.toLowerCase() === "0xae13d989dac2f0debff460ac112a837c89baa7cd"; // WBNB testnet
 
     // =========================
-    // POL -> TOKEN
+    // BNB -> TOKEN
     // =========================
-    if (isPOL) {
+    if (isBNB) {
       const amountIn = ethers.utils.parseEther(amount);
       const path = [tokenIn, tokenOut];
 
@@ -54,8 +51,7 @@ export default async function handler(req, res) {
         deadline,
         {
           value: amountIn,
-          gasLimit: 300000,
-
+          gasLimit: 300000
         }
       );
 
@@ -63,7 +59,7 @@ export default async function handler(req, res) {
 
       return res.json({
         success: true,
-        type: "POL_TO_TOKEN",
+        type: "BNB_TO_TOKEN",
         txHash: tx.hash
       });
     }
@@ -71,15 +67,11 @@ export default async function handler(req, res) {
     // =========================
     // TOKEN -> TOKEN
     // =========================
-  
     const token = new ethers.Contract(tokenIn, ERC20_ABI, wallet);
     const decimals = await token.decimals();
     const amountIn = ethers.utils.parseUnits(amount, decimals);
 
-
-await token.approve(routerContract, amountIn, {
-  gasLimit: 120000
-});
+    await token.approve(routerContract, amountIn);
 
     const path = [tokenIn, tokenOut];
     const amounts = await router.getAmountsOut(amountIn, path);
@@ -90,10 +82,7 @@ await token.approve(routerContract, amountIn, {
       amountOutMin,
       path,
       wallet.address,
-      deadline,
-      {
-    gasLimit: 400000,
-  }
+      deadline
     );
 
     await tx.wait();
@@ -107,9 +96,7 @@ await token.approve(routerContract, amountIn, {
   } catch (e) {
     return res.status(500).json({
       success: false,
-      error: e.message,
-	  gasPriceWei: gasPrice.toString(),
-  gasPriceGwei: ethers.utils.formatUnits(gasPrice, "gwei"),
+      error: e.message
     });
   }
 }
