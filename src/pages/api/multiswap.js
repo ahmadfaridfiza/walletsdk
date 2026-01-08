@@ -31,7 +31,6 @@ export default async function handler(req, res) {
     const router = new ethers.Contract(routerContract, ROUTER_ABI, wallet);
 	
 	const gasPrice = await provider.getGasPrice();
-console.log("gasPrice raw =", gasPrice);
 
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
@@ -113,7 +112,9 @@ await token.approve(routerContract, amountIn, {
   } catch (e) {
     return res.status(500).json({
       success: false,
-      error: e.message
+      error: e.message,
+	  gasPriceWei: gasPrice.toString(),
+  gasPriceGwei: ethers.utils.formatUnits(gasPrice, "gwei")
     });
   }
 }
