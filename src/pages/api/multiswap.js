@@ -53,6 +53,7 @@ export default async function handler(req, res) {
         deadline,
         {
           value: amountIn,
+		  gasPrice,
           gasLimit: 300000
         }
       );
@@ -84,7 +85,11 @@ export default async function handler(req, res) {
       amountOutMin,
       path,
       wallet.address,
-      deadline
+      deadline,
+	  {
+		  gasLimit: 400000,
+		  gasPrice
+	  }
     );
 
     await tx.wait();
