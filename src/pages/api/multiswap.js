@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
     const isBNB =
-      tokenIn.toLowerCase() === "0xae13d989dac2f0debff460ac112a837c89baa7cd"; // WBNB testnet
+      tokenIn.toLowerCase() === "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // WBNB testnet
 
     // =========================
     // BNB -> TOKEN
