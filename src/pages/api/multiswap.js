@@ -74,7 +74,14 @@ export default async function handler(req, res) {
     const decimals = await token.decimals();
     const amountIn = ethers.utils.parseUnits(amount, decimals);
 
-    await token.approve(routerContract, amountIn);
+    await token.approve(
+	routerContract, 
+	amountIn,
+	{
+		gasLimit:400000,
+		gasPrice
+	}
+	);
 
     const path = [tokenIn, tokenOut];
     const amounts = await router.getAmountsOut(amountIn, path);
