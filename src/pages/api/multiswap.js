@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     const wallet = new ethers.Wallet(privatekey, provider);
     const router = new ethers.Contract(routerContract, ROUTER_ABI, wallet);
 	
-	const gasPrice = await provider.getGasPrice();
+	gasPrice = await provider.getGasPrice();
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
     const isBNB =
