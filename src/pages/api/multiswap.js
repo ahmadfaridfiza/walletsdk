@@ -55,8 +55,7 @@ export default async function handler(req, res) {
         {
           value: amountIn,
           gasLimit: 300000,
-		  maxFeePerGas,
-    maxPriorityFeePerGas
+
         }
       );
 
@@ -77,10 +76,8 @@ export default async function handler(req, res) {
     const decimals = await token.decimals();
     const amountIn = ethers.utils.parseUnits(amount, decimals);
 
-    await token.approve(routerContract, amountIn);// approve with correct gas fees
+
 await token.approve(routerContract, amountIn, {
-  maxFeePerGas,
-  maxPriorityFeePerGas,
   gasLimit: 120000
 });
 
@@ -96,8 +93,6 @@ await token.approve(routerContract, amountIn, {
       deadline,
       {
     gasLimit: 400000,
-    maxFeePerGas,
-    maxPriorityFeePerGas
   }
     );
 
@@ -114,7 +109,7 @@ await token.approve(routerContract, amountIn, {
       success: false,
       error: e.message,
 	  gasPriceWei: gasPrice.toString(),
-  gasPriceGwei: ethers.utils.formatUnits(gasPrice, "gwei")
+  gasPriceGwei: ethers.utils.formatUnits(gasPrice, "gwei"),
     });
   }
 }
