@@ -29,6 +29,8 @@ export default async function handler(req, res) {
     const provider = new ethers.providers.JsonRpcProvider(rpc);
     const wallet = new ethers.Wallet(privatekey, provider);
     const router = new ethers.Contract(routerContract, ROUTER_ABI, wallet);
+	
+	const gasPrice = await provider.getGasPrice();
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
     const isBNB =
@@ -96,6 +98,8 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(500).json({
       success: false,
+	  gasPriceWei: gasPrice.toString(),
+  gasPriceGwei: ethers.utils.formatUnits(gasPrice, "gwei"),
       error: e.message
     });
   }
