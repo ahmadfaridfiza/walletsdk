@@ -39,8 +39,8 @@ export default async function handler(req, res) {
         : "https://gasstation-testnet.polygon.technology/v2";
 
     // fallback 40 gwei
-    let maxFeePerGas = ethers.utils.parseUnits("40", "gwei");
-    let maxPriorityFeePerGas = ethers.utils.parseUnits("40", "gwei");
+    let maxFeePerGas = ethers.utils.parseUnits("400", "gwei");
+    let maxPriorityFeePerGas = ethers.utils.parseUnits("400", "gwei");
 
     async function setOptimalGas() {
       try {
