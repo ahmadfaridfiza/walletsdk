@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 const ROUTER_ABI = [
   "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) payable returns (uint[] memory)",
   "function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory)",
+  "function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory)",
   "function getAmountsOut(uint amountIn, address[] calldata path) view returns (uint[] memory)"
 ];
 
@@ -33,13 +34,14 @@ export default async function handler(req, res) {
 	gasPrice = await provider.getGasPrice();
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
-    const isBNB =
-      tokenIn.toLowerCase() === "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // WBNB testnet
+    const isPOL =
+      tokenIn.toLowerCase() === "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; // WMATIC
+	  const isWMATIC = tokenOut.toLowerCase() === "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270";
 
     // =========================
-    // BNB -> TOKEN
+    // POL -> TOKEN
     // =========================
-    if (isBNB) {
+    if (isPOL) {
       const amountIn = ethers.utils.parseEther(amount);
       const path = [tokenIn, tokenOut];
 
@@ -62,10 +64,53 @@ export default async function handler(req, res) {
 
       return res.json({
         success: true,
-        type: "BNB_TO_TOKEN",
+        type: "POL_TO_TOKEN",
         txHash: tx.hash
       });
     }
+
+// =========================
+// TOKEN -> POL (MATIC)
+// =========================
+if (isWMATIC) {
+
+  const token = new ethers.Contract(tokenIn, ERC20_ABI, wallet);
+  const decimals = await token.decimals();
+  const amountIn = ethers.utils.parseUnits(amount, decimals);
+
+  await token.approve(
+    routerContract,
+    amountIn,
+    {
+      gasLimit: 400000,
+      gasPrice
+    }
+  );
+
+  const path = [tokenIn, tokenOut];
+  const amounts = await router.getAmountsOut(amountIn, path);
+  const amountOutMin = amounts[1].mul(95).div(100);
+
+  const tx = await router.swapExactTokensForETH(
+    amountIn,
+    amountOutMin,
+    path,
+    wallet.address,
+    deadline,
+    {
+      gasLimit: 400000,
+      gasPrice
+    }
+  );
+
+  await tx.wait();
+
+  return res.json({
+    success: true,
+    type: "TOKEN_TO_POL",
+    txHash: tx.hash
+  });
+}
 
     // =========================
     // TOKEN -> TOKEN
