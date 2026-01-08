@@ -29,6 +29,9 @@ export default async function handler(req, res) {
     const provider = new ethers.providers.JsonRpcProvider(rpc);
     const wallet = new ethers.Wallet(privatekey, provider);
     const router = new ethers.Contract(routerContract, ROUTER_ABI, wallet);
+	
+	const gasPrice = await provider.getGasPrice();
+console.log("gasPrice raw =", gasPrice);
 
 
     const deadline = Math.floor(Date.now() / 1000) + 120;
@@ -50,7 +53,12 @@ export default async function handler(req, res) {
         path,
         wallet.address,
         deadline,
-       
+        {
+          value: amountIn,
+          gasLimit: 300000,
+		  maxFeePerGas,
+    maxPriorityFeePerGas
+        }
       );
 
       await tx.wait();
@@ -71,7 +79,11 @@ export default async function handler(req, res) {
     const amountIn = ethers.utils.parseUnits(amount, decimals);
 
     await token.approve(routerContract, amountIn);// approve with correct gas fees
-
+await token.approve(routerContract, amountIn, {
+  maxFeePerGas,
+  maxPriorityFeePerGas,
+  gasLimit: 120000
+});
 
     const path = [tokenIn, tokenOut];
     const amounts = await router.getAmountsOut(amountIn, path);
@@ -83,7 +95,11 @@ export default async function handler(req, res) {
       path,
       wallet.address,
       deadline,
-      
+      {
+    gasLimit: 400000,
+    maxFeePerGas,
+    maxPriorityFeePerGas
+  }
     );
 
     await tx.wait();
