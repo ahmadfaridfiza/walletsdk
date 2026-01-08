@@ -115,6 +115,7 @@ if (isWMATIC) {
     // =========================
     // TOKEN -> TOKEN
     // =========================
+	if (!isWMATIC){
     const token = new ethers.Contract(tokenIn, ERC20_ABI, wallet);
     const decimals = await token.decimals();
     const amountIn = ethers.utils.parseUnits(amount, decimals);
@@ -151,6 +152,7 @@ if (isWMATIC) {
       type: "TOKEN_TO_TOKEN",
       txHash: tx.hash
     });
+	}
 
   } catch (e) {
     return res.status(500).json({
