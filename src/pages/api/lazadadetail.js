@@ -56,10 +56,9 @@ for (const s of image_selectors) {
 }
 
 const price_selectors = [
-  "span.pdp-v2-product-price-content-salePrice-amount",
-  "span[class*='salePrice-amount']",
-  "div[data-testid='lblPDPDetailProductPrice']",
-  "div[data-testid='product-price']",
+  "div.flex.items-baseline span",
+  "div[class*='flex'][class*='items-baseline'] span",
+  "span[data-testid='lblPDPDetailProductPrice']",
   "span[class*='price']"
 ]
 
