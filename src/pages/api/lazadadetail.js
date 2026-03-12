@@ -27,9 +27,11 @@ browser = await playwrightChromium.launch({
 const page = await browser.newPage()
 
 await page.goto(shortlink, {
-  waitUntil: "networkidle",
+  waitUntil: "domcontentloaded",
   timeout: 30000
 })
+
+await page.waitForTimeout(3000)
 
 const realUrl = page.url()
 
